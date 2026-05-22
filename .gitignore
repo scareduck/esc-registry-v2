@@ -1,0 +1,88 @@
+# Local environment / secrets
+.env
+.env.*
+!.env.example
+*.local
+*.secret
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+build/
+dist/
+
+# Node / frontend tooling
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.next/
+.nuxt/
+.svelte-kit/
+vite.config.*.timestamp-*
+
+# Editor / OS clutter
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs and runtime files
+logs/
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Local databases, dumps, and generated data
+*.sql
+*.sql.gz
+*.dump
+*.backup
+*.bak
+*.db
+*.sqlite
+*.sqlite3
+*.csv
+*.tsv
+*.parquet
+*.jsonl
+
+# ESCR registry data safety
+# Do not commit real registry exports, local MariaDB dumps, or generated reports
+# containing member, owner, breeder, registrar, or dog records.
+data/
+exports/
+reports/
+private/
+registry-dumps/
+local-db/
+
+# Docker / local compose overrides
+compose.override.yml
+docker-compose.override.yml
+
+# Test and generated artifacts that should be recreated locally
+.cache/
+tmp/
+temp/
+artifacts/
