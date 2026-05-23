@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ESCR Registry Explorer</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -18,11 +19,154 @@ header {
   background: #1a73e8;
   color: #fff;
   padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
 }
 header h1 { font-size: 18px; font-weight: 600; }
+
+main { padding: 40px 20px 60px; }
+
+/* ── Search input ────────────────────────────────────────────────── */
+
+.search-wrap {
+  max-width: 640px;
+  margin: 0 auto 36px;
+}
+
+.search-box { position: relative; }
+
+#q {
+  width: 100%;
+  padding: 13px 20px;
+  font-size: 16px;
+  font-family: inherit;
+  border: 1px solid #dadce0;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  outline: none;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+#q:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 1px 8px rgba(26,115,232,0.22);
+}
+
+/* ── Completion dropdown ─────────────────────────────────────────── */
+
+#dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0; right: 0;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.dd-label {
+  padding: 10px 18px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #80868b;
+}
+
+.dd-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 18px;
+  text-decoration: none;
+  color: #202124;
+  cursor: pointer;
+}
+.dd-row:hover { background: #f8f9fa; }
+
+.dd-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dd-sub {
+  font-size: 12px;
+  color: #5f6368;
+  white-space: nowrap;
+}
+
+.dd-footer {
+  padding: 9px 18px;
+  border-top: 1px solid #f1f3f4;
+}
+.dd-footer a {
+  font-size: 13px;
+  color: #1a73e8;
+  text-decoration: none;
+}
+.dd-footer a:hover { text-decoration: underline; }
+
+/* ── Full results ────────────────────────────────────────────────── */
+
+#results { max-width: 900px; margin: 0 auto; }
+
+.result-section { margin-bottom: 32px; }
+
+.result-section h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #dadce0;
+}
+.result-count { font-weight: 400; color: #5f6368; margin-left: 4px; }
+
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.result-table th {
+  text-align: left;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5f6368;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dadce0;
+}
+.result-table td {
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid #f1f3f4;
+  vertical-align: middle;
+}
+.result-table tr:last-child td { border-bottom: none; }
+.result-table tbody tr:hover { background: #f8f9fa; }
+.result-table a { color: #1a73e8; text-decoration: none; }
+.result-table a:hover { text-decoration: underline; }
+
+.result-more {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #80868b;
+  font-style: italic;
+}
+
+.no-results {
+  text-align: center;
+  color: #5f6368;
+  padding: 48px 0;
+  font-size: 15px;
+}
 </style>
 </head>
 <body>
@@ -31,11 +175,216 @@ header h1 { font-size: 18px; font-weight: 600; }
   <h1>ESCR Registry Explorer</h1>
 </header>
 
-<!-- TODO -->
+<main>
+  <div class="search-wrap">
+    <div class="search-box">
+      <input type="text" id="q" placeholder="Search dogs, people, kennels…"
+             autocomplete="off" spellcheck="false">
+      <div id="dropdown" hidden></div>
+    </div>
+  </div>
+
+  <div id="results" hidden></div>
+</main>
 
 <script>
 "use strict";
-// TODO
+
+const input    = document.getElementById('q');
+const dropdown = document.getElementById('dropdown');
+const results  = document.getElementById('results');
+
+let debounceTimer = null;
+
+// ── Input events ──────────────────────────────────────────────────────
+
+input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const q = input.value.trim();
+    if (q.length < 2) { closeDropdown(); return; }
+    debounceTimer = setTimeout(() => fetchCompletion(q), 220);
+});
+
+input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const q = input.value.trim();
+        if (q.length >= 2) runSearch(q);
+    }
+    if (e.key === 'Escape') closeDropdown();
+});
+
+document.addEventListener('mousedown', e => {
+    if (!e.target.closest('.search-box')) closeDropdown();
+});
+
+// ── Completion dropdown ───────────────────────────────────────────────
+
+async function fetchCompletion(q) {
+    try {
+        const res  = await fetch('api.php?type=search&q=' + encodeURIComponent(q));
+        const data = await res.json();
+        renderDropdown(q, data);
+    } catch (_) {}
+}
+
+function renderDropdown(q, { dogs, people, kennels }) {
+    if (!dogs.length && !people.length && !kennels.length) {
+        closeDropdown();
+        return;
+    }
+
+    let html = '';
+
+    if (dogs.length) {
+        html += '<div class="dd-label">Dogs</div>';
+        for (const d of dogs) {
+            html += `<a class="dd-row" href="dog.html?id=${d.id}">
+                <span class="dd-name">${esc(d.name ?? '')}</span>
+                <span class="dd-sub">${esc(d.registrationNumber ?? '')}</span>
+            </a>`;
+        }
+    }
+
+    if (people.length) {
+        html += '<div class="dd-label">People</div>';
+        for (const p of people) {
+            const name = joinName(p.givenName, p.familyName);
+            html += `<a class="dd-row" href="person.html?id=${p.id}">
+                <span class="dd-name">${esc(name)}</span>
+                ${p.kennel ? `<span class="dd-sub">${esc(p.kennel)}</span>` : ''}
+            </a>`;
+        }
+    }
+
+    if (kennels.length) {
+        html += '<div class="dd-label">Kennels</div>';
+        for (const k of kennels) {
+            html += `<a class="dd-row" href="kennel.html?id=${k.id}">
+                <span class="dd-name">${esc(k.name ?? '')}</span>
+            </a>`;
+        }
+    }
+
+    html += `<div class="dd-footer">
+        <a href="#" data-q="${esc(q)}" id="see-all">See all results for "${esc(q)}" →</a>
+    </div>`;
+
+    dropdown.innerHTML = html;
+    dropdown.hidden = false;
+
+    document.getElementById('see-all').addEventListener('click', e => {
+        e.preventDefault();
+        runSearch(q);
+    });
+}
+
+function closeDropdown() {
+    dropdown.hidden = true;
+    dropdown.innerHTML = '';
+}
+
+// ── Full results ──────────────────────────────────────────────────────
+
+async function runSearch(q) {
+    closeDropdown();
+    input.value = q;
+
+    results.innerHTML = '<p class="no-results">Searching…</p>';
+    results.hidden = false;
+
+    try {
+        const res  = await fetch('api.php?type=search&q=' + encodeURIComponent(q) + '&limit=25');
+        const data = await res.json();
+        renderResults(q, data);
+    } catch (_) {
+        results.innerHTML = '<p class="no-results">Search failed — check the server connection.</p>';
+    }
+}
+
+function renderResults(q, { dogs, people, kennels, has_more }) {
+    if (!dogs.length && !people.length && !kennels.length) {
+        results.innerHTML = `<p class="no-results">No results for <strong>${esc(q)}</strong>.</p>`;
+        return;
+    }
+
+    let html = '';
+
+    if (dogs.length) {
+        html += `<div class="result-section">
+            <h2>Dogs <span class="result-count">(${dogs.length}${has_more.dogs ? '+' : ''})</span></h2>
+            <table class="result-table">
+                <thead><tr>
+                    <th>Name</th><th>Reg #</th><th>Sex</th><th>Owner</th>
+                </tr></thead><tbody>`;
+        for (const d of dogs) {
+            html += `<tr>
+                <td><a href="dog.html?id=${d.id}">${esc(d.name ?? '—')}</a></td>
+                <td>${esc(d.registrationNumber ?? '—')}</td>
+                <td>${esc(d.sex ?? '—')}</td>
+                <td>${d.ownerId
+                    ? `<a href="person.html?id=${d.ownerId}">${esc(d.ownerName)}</a>`
+                    : '—'}</td>
+            </tr>`;
+        }
+        html += `</tbody></table>`;
+        if (has_more.dogs) html += `<p class="result-more">Showing first 25 — refine your search to see more specific results.</p>`;
+        html += `</div>`;
+    }
+
+    if (people.length) {
+        html += `<div class="result-section">
+            <h2>People <span class="result-count">(${people.length}${has_more.people ? '+' : ''})</span></h2>
+            <table class="result-table">
+                <thead><tr>
+                    <th>Name</th><th>Kennel</th>
+                </tr></thead><tbody>`;
+        for (const p of people) {
+            const name = joinName(p.givenName, p.familyName) || '—';
+            html += `<tr>
+                <td><a href="person.html?id=${p.id}">${esc(name)}</a></td>
+                <td>${p.kennel ? esc(p.kennel) : '—'}</td>
+            </tr>`;
+        }
+        html += `</tbody></table>`;
+        if (has_more.people) html += `<p class="result-more">Showing first 25 — refine your search to see more specific results.</p>`;
+        html += `</div>`;
+    }
+
+    if (kennels.length) {
+        html += `<div class="result-section">
+            <h2>Kennels <span class="result-count">(${kennels.length}${has_more.kennels ? '+' : ''})</span></h2>
+            <table class="result-table">
+                <thead><tr>
+                    <th>Kennel</th><th>Contact</th>
+                </tr></thead><tbody>`;
+        for (const k of kennels) {
+            html += `<tr>
+                <td><a href="kennel.html?id=${k.id}">${esc(k.name ?? '—')}</a></td>
+                <td>${k.primaryPerson ? esc(k.primaryPerson) : '—'}</td>
+            </tr>`;
+        }
+        html += `</tbody></table>`;
+        if (has_more.kennels) html += `<p class="result-more">Showing first 25 — refine your search to see more specific results.</p>`;
+        html += `</div>`;
+    }
+
+    results.innerHTML = html;
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────
+
+function joinName(given, family) {
+    return [given, family].filter(Boolean).join(' ');
+}
+
+function esc(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
 </script>
 </body>
 </html>
