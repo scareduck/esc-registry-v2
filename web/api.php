@@ -2,17 +2,35 @@
 header('Content-Type: application/json');
 header('Cache-Control: no-cache');
 
-if (file_exists(__DIR__ . '/../.env')) {
-    foreach (file(__DIR__ . '/../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+// Load .env into an array so absent keys can be distinguished from empty-string values.
+function loadEnv(string $path): array {
+    if (!file_exists($path)) return [];
+    $out = [];
+    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
         if ($line === '' || $line[0] === '#' || !str_contains($line, '=')) continue;
         [$k, $v] = explode('=', $line, 2);
-        if (!getenv(trim($k))) putenv(trim($k) . '=' . trim($v));
+        $out[trim($k)] = trim($v);
     }
+    return $out;
 }
 
-$dsn  = getenv('DB_DSN')  ?: 'mysql:host=127.0.0.1;dbname=RegistryDB;charset=utf8mb4';
-$user = getenv('DB_USER') ?: 'registry_ro';
-$pass = getenv('DB_PASS') ?: '';
+// Parse ~/.my.cnf; merge [mysql] then [client] so [client] wins (more standard).
+function readMyCnf(): array {
+    $home = getenv('HOME') ?: '';
+    $path = $home . '/.my.cnf';
+    if (!$home || !file_exists($path)) return [];
+    $ini = @parse_ini_file($path, true, INI_SCANNER_RAW);
+    if (!is_array($ini)) return [];
+    return array_merge($ini['mysql'] ?? [], $ini['client'] ?? []);
+}
+
+$env = loadEnv(__DIR__ . '/../.env');
+$cnf = readMyCnf();
+
+// Resolution order: .env > ~/.my.cnf > built-in default.
+$dsn  = $env['DB_DSN']  ?? 'mysql:host=127.0.0.1;dbname=RegistryDB;charset=utf8mb4';
+$user = $env['DB_USER'] ?? $cnf['user']     ?? '';
+$pass = $env['DB_PASS'] ?? $cnf['password'] ?? $cnf['pass'] ?? '';
 
 try {
     $pdo = new PDO($dsn, $user, $pass, [
