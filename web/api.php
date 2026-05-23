@@ -184,5 +184,414 @@ if ($type === 'search') {
     exit;
 }
 
+// ── Dog detail ───────────────────────────────────────────────────────
+// ?type=dog&id=<id>
+
+if ($type === 'dog') {
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'invalid id']); exit; }
+
+    // Main dog row
+    $stmt = $pdo->prepare("
+        SELECT d.id, d.name, d.registrationNumber, d.dateRegistered, d.puppyLetter,
+               sx.text AS sex,
+               rt.text AS registrationType,
+               cc.text AS coatColor,
+               b.sire  AS sireId,   ds.name AS sireName,   ds.registrationNumber AS sireReg,
+               l.dam   AS damId,    dl.name AS damName,    dl.registrationNumber  AS damReg,
+               l.id    AS litterId, l.litterNumber,        l.dateOfWhelp,
+               l.breeder AS breederId,
+               TRIM(CONCAT(COALESCE(bp.givenName,''),' ',COALESCE(bp.familyName,''))) AS breederName,
+               d.owner        AS ownerId,
+               TRIM(CONCAT(COALESCE(po.givenName,''),' ',COALESCE(po.familyName,''))) AS ownerName,
+               d.previousOwner AS previousOwnerId,
+               TRIM(CONCAT(COALESCE(pv.givenName,''),' ',COALESCE(pv.familyName,''))) AS previousOwnerName,
+               d.beneficiary  AS beneficiaryId,
+               TRIM(CONCAT(COALESCE(bn.givenName,''),' ',COALESCE(bn.familyName,''))) AS beneficiaryName,
+               d.registeredBy AS registeredById,
+               TRIM(CONCAT(COALESCE(rb.givenName,''),' ',COALESCE(rb.familyName,''))) AS registeredByName,
+               d.details AS detailsId
+        FROM   Dog d
+        LEFT JOIN Sex            sx ON sx.code = d.sex
+        LEFT JOIN RegistrationType rt ON rt.code = d.registrationType
+        LEFT JOIN CoatColor      cc ON cc.code = d.coatColor
+        LEFT JOIN Breeding        b ON b.id   = d.breeding
+        LEFT JOIN Dog            ds ON ds.id  = b.sire
+        LEFT JOIN Litter          l ON l.id   = b.litter
+        LEFT JOIN Dog            dl ON dl.id  = l.dam
+        LEFT JOIN Person         bp ON bp.id  = l.breeder
+        LEFT JOIN Person         po ON po.id  = d.owner
+        LEFT JOIN Person         pv ON pv.id  = d.previousOwner
+        LEFT JOIN Person         bn ON bn.id  = d.beneficiary
+        LEFT JOIN Person         rb ON rb.id  = d.registeredBy
+        WHERE  d.id = :id
+    ");
+    $stmt->execute([':id' => $id]);
+    $dog = $stmt->fetch();
+    if (!$dog) { http_response_code(404); echo json_encode(['error' => 'dog not found']); exit; }
+
+    foreach (['ownerName','previousOwnerName','beneficiaryName','registeredByName','breederName'] as $f) {
+        $dog[$f] = trim($dog[$f]) ?: null;
+    }
+
+    // DogDetail with joined lookup texts
+    $detail = null;
+    if ($dog['detailsId']) {
+        $stmt = $pdo->prepare("
+            SELECT dd.*,
+                   ohr.text  AS ofaHipsResultText,
+                   oer.text  AS ofaElbowsResultText,
+                   cr.text   AS cerfResultText,
+                   mr.text   AS mdr1ResultText,
+                   sni.text  AS spayNeuterIntactText,
+                   t.text    AS tailText,
+                   wm.text   AS whiteMarkingsText,
+                   mcr.text  AS microchipRegistryText,
+                   mct.text  AS microchipTypeText,
+                   yn_be.text   AS blueEyesText,
+                   yn_rd.text   AS rearDewClawsText,
+                   yn_fo.text   AS farmOrRanchDogText,
+                   yn_djdl.text AS pennHIPDJDLeftText,
+                   yn_djdr.text AS pennHIPDJDRightText,
+                   yn_cavl.text AS pennHIPCavLeftText,
+                   yn_cavr.text AS pennHIPCavRightText,
+                   cc2.text  AS detailCoatColorText
+            FROM   DogDetail dd
+            LEFT JOIN OfaHipsResult            ohr  ON ohr.code  = dd.ofaHipsResult
+            LEFT JOIN OfaElbowsResult          oer  ON oer.code  = dd.ofaElbowsResult
+            LEFT JOIN CerfResult               cr   ON cr.code   = dd.cerfResult
+            LEFT JOIN Mdr1GeneticMutationResult mr  ON mr.code   = dd.mdr1GeneticMutationResult
+            LEFT JOIN SpayNeuterIntact         sni  ON sni.code  = dd.spayNeuterIntact
+            LEFT JOIN Tail                     t    ON t.code    = dd.tail
+            LEFT JOIN WhiteMarkings            wm   ON wm.code   = dd.predominantWhiteMarkings
+            LEFT JOIN MicrochipRegistry        mcr  ON mcr.code  = dd.microchipRegistry
+            LEFT JOIN MicrochipType            mct  ON mct.code  = dd.microchipType
+            LEFT JOIN YesNo yn_be   ON yn_be.code   = dd.blueEyes
+            LEFT JOIN YesNo yn_rd   ON yn_rd.code   = dd.rearDewClaws
+            LEFT JOIN YesNo yn_fo   ON yn_fo.code   = dd.farmOrRanchDog
+            LEFT JOIN YesNo yn_djdl ON yn_djdl.code = dd.pennHIPDJDLeft
+            LEFT JOIN YesNo yn_djdr ON yn_djdr.code = dd.pennHIPDJDRight
+            LEFT JOIN YesNo yn_cavl ON yn_cavl.code = dd.pennHIPCavitationLeft
+            LEFT JOIN YesNo yn_cavr ON yn_cavr.code = dd.pennHIPCavitationRight
+            LEFT JOIN CoatColor cc2 ON cc2.code = dd.coatColor
+            WHERE  dd.id = :did
+        ");
+        $stmt->execute([':did' => $dog['detailsId']]);
+        $detail = $stmt->fetch();
+    }
+
+    // Junction tables: occupations, health problems, other markings
+    function junctionList($pdo, $detailId, $junctionTable, $lookupTable) {
+        $stmt = $pdo->prepare("
+            SELECT lk.text FROM {$junctionTable} jt
+            JOIN   {$lookupTable} lk ON lk.code = jt.code
+            WHERE  jt.id = :id ORDER BY lk.menuOrder
+        ");
+        $stmt->execute([':id' => $detailId]);
+        return array_column($stmt->fetchAll(), 'text');
+    }
+    $occupations   = $dog['detailsId'] ? junctionList($pdo, $dog['detailsId'], 'Dog_DogsJob',              'DogsJob')              : [];
+    $healthProbs   = $dog['detailsId'] ? junctionList($pdo, $dog['detailsId'], 'Dog_HealthProblem',        'HealthProblem')        : [];
+    $otherMarkings = $dog['detailsId'] ? junctionList($pdo, $dog['detailsId'], 'Dog_OtherMarkingsOrColors','OtherMarkingsOrColors') : [];
+
+    // 3-generation pedigree (7 small queries)
+    function dogParents($pdo, $dogId) {
+        if (!$dogId) return ['sire' => null, 'dam' => null];
+        $s = $pdo->prepare("
+            SELECT b.sire AS sId, ds.name AS sName, ds.registrationNumber AS sReg,
+                   l.dam  AS dId, dl.name AS dName, dl.registrationNumber  AS dReg
+            FROM   Dog d
+            LEFT JOIN Breeding b  ON b.id  = d.breeding
+            LEFT JOIN Dog      ds ON ds.id = b.sire
+            LEFT JOIN Litter   l  ON l.id  = b.litter
+            LEFT JOIN Dog      dl ON dl.id = l.dam
+            WHERE  d.id = :id
+        ");
+        $s->execute([':id' => $dogId]);
+        $r = $s->fetch();
+        if (!$r) return ['sire' => null, 'dam' => null];
+        return [
+            'sire' => $r['sId'] ? ['id' => (int)$r['sId'], 'name' => $r['sName'], 'reg' => $r['sReg']] : null,
+            'dam'  => $r['dId'] ? ['id' => (int)$r['dId'], 'name' => $r['dName'], 'reg' => $r['dReg']] : null,
+        ];
+    }
+    $g1  = dogParents($pdo, $id);
+    $g2p = dogParents($pdo, $g1['sire']['id'] ?? null);
+    $g2m = dogParents($pdo, $g1['dam']['id']  ?? null);
+    $g3pp = dogParents($pdo, $g2p['sire']['id'] ?? null);
+    $g3pm = dogParents($pdo, $g2p['dam']['id']  ?? null);
+    $g3mp = dogParents($pdo, $g2m['sire']['id'] ?? null);
+    $g3mm = dogParents($pdo, $g2m['dam']['id']  ?? null);
+    $pedigree = [
+        'sire'           => $g1['sire'],    'dam'           => $g1['dam'],
+        'sire_sire'      => $g2p['sire'],   'sire_dam'      => $g2p['dam'],
+        'dam_sire'       => $g2m['sire'],   'dam_dam'       => $g2m['dam'],
+        'sire_sire_sire' => $g3pp['sire'],  'sire_sire_dam' => $g3pp['dam'],
+        'sire_dam_sire'  => $g3pm['sire'],  'sire_dam_dam'  => $g3pm['dam'],
+        'dam_sire_sire'  => $g3mp['sire'],  'dam_sire_dam'  => $g3mp['dam'],
+        'dam_dam_sire'   => $g3mm['sire'],  'dam_dam_dam'   => $g3mm['dam'],
+    ];
+
+    // Littermates (same Litter.id, different dog)
+    $littermates = [];
+    if ($dog['litterId']) {
+        $stmt = $pdo->prepare("
+            SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex
+            FROM   Dog     d2
+            JOIN   Breeding b2 ON b2.id = d2.breeding AND b2.litter = :lit
+            LEFT JOIN Sex  sx ON sx.code = d2.sex
+            WHERE  d2.id != :did
+            ORDER  BY d2.name
+        ");
+        $stmt->bindValue(':lit', $dog['litterId'], PDO::PARAM_INT);
+        $stmt->bindValue(':did', $id,              PDO::PARAM_INT);
+        $stmt->execute();
+        $littermates = $stmt->fetchAll();
+    }
+
+    // Full siblings (same sire AND dam, different litter)
+    $fullSiblings = [];
+    if ($dog['sireId'] && $dog['damId'] && $dog['litterId']) {
+        $stmt = $pdo->prepare("
+            SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp
+            FROM   Breeding b2
+            JOIN   Litter   l2 ON l2.id = b2.litter AND l2.dam = :dam AND l2.id != :lit
+            JOIN   Dog      d2 ON d2.breeding = b2.id AND d2.id != :did
+            LEFT JOIN Sex   sx ON sx.code = d2.sex
+            WHERE  b2.sire = :sire
+            ORDER  BY l2.dateOfWhelp, d2.name
+        ");
+        $stmt->bindValue(':sire', $dog['sireId'],   PDO::PARAM_INT);
+        $stmt->bindValue(':dam',  $dog['damId'],    PDO::PARAM_INT);
+        $stmt->bindValue(':lit',  $dog['litterId'], PDO::PARAM_INT);
+        $stmt->bindValue(':did',  $id,              PDO::PARAM_INT);
+        $stmt->execute();
+        $fullSiblings = $stmt->fetchAll();
+    }
+
+    // Progeny (litters where this dog was sire)
+    $progeny = [];
+    $stmt = $pdo->prepare("
+        SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex,
+               l.id AS litterId, l.dateOfWhelp,
+               dm.id AS damId, dm.name AS damName, dm.registrationNumber AS damReg
+        FROM   Breeding b
+        JOIN   Litter   l  ON l.id  = b.litter
+        JOIN   Dog      dm ON dm.id = l.dam
+        JOIN   Dog      d2 ON d2.breeding = b.id
+        LEFT JOIN Sex   sx ON sx.code = d2.sex
+        WHERE  b.sire = :sire
+        ORDER  BY l.dateOfWhelp, dm.name, d2.name
+    ");
+    $stmt->bindValue(':sire', $id, PDO::PARAM_INT);
+    $stmt->execute();
+    $progeny = $stmt->fetchAll();
+
+    echo json_encode([
+        'dog'          => $dog,
+        'detail'       => $detail,
+        'occupations'  => $occupations,
+        'healthProblems' => $healthProbs,
+        'otherMarkings' => $otherMarkings,
+        'pedigree'     => $pedigree,
+        'littermates'  => $littermates,
+        'fullSiblings' => $fullSiblings,
+        'progeny'      => $progeny,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ── Person detail ────────────────────────────────────────────────────
+// ?type=person&id=<id>
+
+if ($type === 'person') {
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'invalid id']); exit; }
+
+    $stmt = $pdo->prepare("
+        SELECT p.id, p.givenName, p.familyName, p.username, p.comments, p.registrarsComments,
+               k.id   AS kennelId,   k.name AS kennelName,
+               yn.text AS isBreederText,
+               al.text AS aliveText,
+               ur.text AS roleText
+        FROM   Person p
+        LEFT JOIN Kennel   k  ON k.id   = p.kennel
+        LEFT JOIN YesNo    yn ON yn.code = p.isBreeder
+        LEFT JOIN Alive    al ON al.code = p.alive
+        LEFT JOIN UserRole ur ON ur.code = p.role
+        WHERE  p.id = :id
+    ");
+    $stmt->execute([':id' => $id]);
+    $person = $stmt->fetch();
+    if (!$person) { http_response_code(404); echo json_encode(['error' => 'person not found']); exit; }
+
+    // Dogs currently owned
+    $stmt = $pdo->prepare("
+        SELECT d.id, d.name, d.registrationNumber, sx.text AS sex,
+               cc.text AS coatColor, l.dateOfWhelp
+        FROM   Dog d
+        LEFT JOIN Sex      sx ON sx.code = d.sex
+        LEFT JOIN CoatColor cc ON cc.code = d.coatColor
+        LEFT JOIN Breeding  b  ON b.id   = d.breeding
+        LEFT JOIN Litter    l  ON l.id   = b.litter
+        WHERE  d.owner = :id
+        ORDER  BY d.name
+    ");
+    $stmt->execute([':id' => $id]);
+    $dogsOwned = $stmt->fetchAll();
+
+    // Dogs previously owned
+    $stmt = $pdo->prepare("
+        SELECT d.id, d.name, d.registrationNumber, sx.text AS sex,
+               d.owner AS currentOwnerId,
+               TRIM(CONCAT(COALESCE(po.givenName,''),' ',COALESCE(po.familyName,''))) AS currentOwnerName
+        FROM   Dog d
+        LEFT JOIN Sex    sx ON sx.code = d.sex
+        LEFT JOIN Person po ON po.id   = d.owner
+        WHERE  d.previousOwner = :id
+        ORDER  BY d.name
+    ");
+    $stmt->execute([':id' => $id]);
+    $dogsPrev = $stmt->fetchAll();
+    foreach ($dogsPrev as &$d) { $d['currentOwnerName'] = trim($d['currentOwnerName']) ?: null; }
+    unset($d);
+
+    // Litters bred: return pups with litter context so JS can group them
+    $stmt = $pdo->prepare("
+        SELECT d.id, d.name, d.registrationNumber, sx.text AS sex,
+               l.id AS litterId, l.dateOfWhelp, l.litterNumber,
+               dam.id   AS damId,  dam.name  AS damName,  dam.registrationNumber  AS damReg,
+               sire.id  AS sireId, sire.name AS sireName, sire.registrationNumber AS sireReg
+        FROM   Litter  l
+        JOIN   Breeding b   ON b.litter = l.id
+        JOIN   Dog      d   ON d.breeding = b.id
+        LEFT JOIN Dog   dam  ON dam.id  = l.dam
+        LEFT JOIN Dog   sire ON sire.id = b.sire
+        LEFT JOIN Sex   sx   ON sx.code = d.sex
+        WHERE  l.breeder = :id
+        ORDER  BY l.dateOfWhelp, l.id, d.name
+    ");
+    $stmt->execute([':id' => $id]);
+    $litterPups = $stmt->fetchAll();
+
+    echo json_encode([
+        'person'       => $person,
+        'dogsOwned'    => $dogsOwned,
+        'dogsPrev'     => $dogsPrev,
+        'litterPups'   => $litterPups,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ── Kennel detail ────────────────────────────────────────────────────
+// ?type=kennel&id=<id>
+
+if ($type === 'kennel') {
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'invalid id']); exit; }
+
+    $stmt = $pdo->prepare("SELECT id, name FROM Kennel WHERE id = :id");
+    $stmt->execute([':id' => $id]);
+    $kennel = $stmt->fetch();
+    if (!$kennel) { http_response_code(404); echo json_encode(['error' => 'kennel not found']); exit; }
+
+    // Members with owned-dog count
+    $stmt = $pdo->prepare("
+        SELECT p.id, p.givenName, p.familyName, yn.text AS isBreederText,
+               (SELECT COUNT(*) FROM Dog d WHERE d.owner = p.id) AS dogsOwned
+        FROM   Person p
+        LEFT JOIN YesNo yn ON yn.code = p.isBreeder
+        WHERE  p.kennel = :id
+        ORDER  BY p.familyName, p.givenName
+    ");
+    $stmt->execute([':id' => $id]);
+    $members = $stmt->fetchAll();
+
+    // All dogs owned by kennel members
+    $stmt = $pdo->prepare("
+        SELECT d.id, d.name, d.registrationNumber, sx.text AS sex,
+               cc.text AS coatColor, l.dateOfWhelp,
+               p.id   AS ownerId,
+               TRIM(CONCAT(COALESCE(p.givenName,''),' ',COALESCE(p.familyName,''))) AS ownerName
+        FROM   Dog d
+        JOIN   Person  p  ON p.id   = d.owner AND p.kennel = :id
+        LEFT JOIN Sex      sx ON sx.code = d.sex
+        LEFT JOIN CoatColor cc ON cc.code = d.coatColor
+        LEFT JOIN Breeding  b  ON b.id   = d.breeding
+        LEFT JOIN Litter    l  ON l.id   = b.litter
+        ORDER  BY p.familyName, p.givenName, d.name
+    ");
+    $stmt->execute([':id' => $id]);
+    $dogs = $stmt->fetchAll();
+    foreach ($dogs as &$d) { $d['ownerName'] = trim($d['ownerName']) ?: null; }
+    unset($d);
+
+    echo json_encode(['kennel' => $kennel, 'members' => $members, 'dogs' => $dogs],
+                     JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ── 5-gen pedigree ───────────────────────────────────────────────────
+// ?type=pedigree&id=<id>
+// Returns {dog, tree} where tree is a map of binary-tree position → {id,name,reg}.
+// Position 1=subject, 2=sire, 3=dam, 4=sire's sire, 5=sire's dam, …
+// Fetches 5 ancestor generations (positions 1–63) in 5 batched queries.
+
+if ($type === 'pedigree') {
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'invalid id']); exit; }
+
+    $stmt = $pdo->prepare("SELECT id, name, registrationNumber AS reg FROM Dog WHERE id = :id");
+    $stmt->execute([':id' => $id]);
+    $root = $stmt->fetch();
+    if (!$root) { http_response_code(404); echo json_encode(['error' => 'dog not found']); exit; }
+
+    $tree  = [1 => ['id' => (int)$root['id'], 'name' => $root['name'], 'reg' => $root['reg']]];
+    $level = [1 => (int)$id];   // position → dogId for current generation
+
+    for ($gen = 0; $gen < 5; $gen++) {
+        $dogIds = array_values(array_filter($level));
+        if (!$dogIds) break;
+
+        $ph   = implode(',', array_fill(0, count($dogIds), '?'));
+        $stmt = $pdo->prepare("
+            SELECT d.id,
+                   b.sire AS sireId, ds.name AS sireName, ds.registrationNumber AS sireReg,
+                   l.dam  AS damId,  dl.name AS damName,  dl.registrationNumber AS damReg
+            FROM   Dog d
+            LEFT JOIN Breeding b  ON b.id  = d.breeding
+            LEFT JOIN Dog      ds ON ds.id = b.sire
+            LEFT JOIN Litter   l  ON l.id  = b.litter
+            LEFT JOIN Dog      dl ON dl.id = l.dam
+            WHERE  d.id IN ($ph)
+        ");
+        $stmt->execute($dogIds);
+
+        $parents = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $parents[(int)$r['id']] = [
+                'sire' => $r['sireId'] ? ['id'=>(int)$r['sireId'],'name'=>$r['sireName'],'reg'=>$r['sireReg']] : null,
+                'dam'  => $r['damId']  ? ['id'=>(int)$r['damId'], 'name'=>$r['damName'], 'reg'=>$r['damReg']]  : null,
+            ];
+        }
+
+        $next = [];
+        foreach ($level as $pos => $dogId) {
+            if (!isset($parents[$dogId])) continue;
+            $pp = $parents[$dogId];
+            foreach (['sire' => $pos*2, 'dam' => $pos*2+1] as $side => $childPos) {
+                if ($pp[$side]) {
+                    $tree[$childPos] = $pp[$side];
+                    if ($gen < 4) $next[$childPos] = $pp[$side]['id'];
+                }
+            }
+        }
+        $level = $next;
+    }
+
+    echo json_encode(['dog' => $tree[1], 'tree' => $tree], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 http_response_code(400);
 echo json_encode(['error' => 'unknown type']);

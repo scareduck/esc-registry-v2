@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dog Detail — ESCR Registry Explorer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  background: #f1f3f4;
+  color: #202124;
+  min-height: 100vh;
+}
+
+header {
+  background: #1a73e8;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header a { color: #fff; text-decoration: none; font-size: 13px; opacity: 0.85; }
+header a:hover { opacity: 1; text-decoration: underline; }
+header h1 { font-size: 18px; font-weight: 600; }
+
+main { max-width: 900px; margin: 0 auto; padding: 32px 20px 60px; }
+
+/* ── Mast ──────────────────────────────────────────────────────────── */
+
+.mast {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  padding: 24px 28px;
+  margin-bottom: 20px;
+}
+.mast-name {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 6px;
+}
+.mast-reg {
+  font-size: 14px;
+  color: #5f6368;
+  margin-bottom: 14px;
+  font-family: monospace;
+}
+.mast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 20px;
+}
+.mast-item { display: flex; flex-direction: column; gap: 2px; }
+.mast-label { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #80868b; }
+.mast-value { font-size: 14px; }
+.mast-value a { color: #1a73e8; text-decoration: none; }
+.mast-value a:hover { text-decoration: underline; }
+
+/* ── Sections ──────────────────────────────────────────────────────── */
+
+.section {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.section-head {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5f6368;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f1f3f4;
+  background: #f8f9fa;
+}
+.section-body { padding: 16px 20px; }
+
+/* ── KV pairs ──────────────────────────────────────────────────────── */
+
+.kv-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 6px 12px;
+  align-items: baseline;
+}
+.kv-label { font-size: 12px; color: #5f6368; }
+.kv-value { font-size: 14px; }
+.kv-value a { color: #1a73e8; text-decoration: none; }
+.kv-value a:hover { text-decoration: underline; }
+
+/* ── Health table ──────────────────────────────────────────────────── */
+
+.health-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.health-table td { padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f1f3f4; vertical-align: top; }
+.health-table tr:last-child td { border-bottom: none; }
+.health-table td:first-child { color: #5f6368; width: 260px; padding-right: 16px; }
+
+/* ── Dog list tables ───────────────────────────────────────────────── */
+
+.dog-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.dog-table th {
+  text-align: left; padding: 6px 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #5f6368; background: #f8f9fa; border-bottom: 1px solid #dadce0;
+}
+.dog-table td { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #f1f3f4; }
+.dog-table tr:last-child td { border-bottom: none; }
+.dog-table tbody tr:hover { background: #f8f9fa; }
+.dog-table a { color: #1a73e8; text-decoration: none; }
+.dog-table a:hover { text-decoration: underline; }
+
+/* ── Pedigree ──────────────────────────────────────────────────────── */
+
+.pedigree-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.pedigree-table td {
+  padding: 4px 10px;
+  border: 1px solid #dadce0;
+  vertical-align: middle;
+}
+.pedigree-table a { color: #1a73e8; text-decoration: none; }
+.pedigree-table a:hover { text-decoration: underline; }
+.ped-gen-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  color: #80868b; padding: 4px 8px; text-align: center; background: #f8f9fa;
+  border: 1px solid #dadce0; writing-mode: vertical-lr; white-space: nowrap;
+}
+.ped-empty { color: #bdc1c6; font-style: italic; }
+
+/* ── Progeny groups ────────────────────────────────────────────────── */
+
+.progeny-group { margin-bottom: 18px; }
+.progeny-group:last-child { margin-bottom: 0; }
+.progeny-group-head {
+  font-size: 12px; font-weight: 600; color: #5f6368;
+  padding: 6px 0 6px;
+  border-bottom: 1px solid #dadce0;
+  margin-bottom: 4px;
+}
+.progeny-group-head a { color: #1a73e8; text-decoration: none; }
+.progeny-group-head a:hover { text-decoration: underline; }
+
+/* ── Free text ─────────────────────────────────────────────────────── */
+
+.free-text {
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Tags ──────────────────────────────────────────────────────────── */
+
+.tag {
+  display: inline-block;
+  background: #e8f0fe;
+  color: #1967d2;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  margin: 2px 3px 2px 0;
+}
+.tag-neutral { background: #f1f3f4; color: #3c4043; }
+
+/* ── Photo grid ────────────────────────────────────────────────────── */
+
+.photo-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.photo-item { display: none; flex-direction: column; gap: 6px; max-width: 260px; }
+.photo-item img {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid #dadce0;
+  display: block;
+}
+.photo-caption { font-size: 12px; color: #5f6368; line-height: 1.4; }
+.no-photos { font-size: 13px; color: #80868b; font-style: italic; }
+
+/* ── Notice / placeholder ──────────────────────────────────────────── */
+
+.notice {
+  background: #fef9e7;
+  border: 1px solid #f9e4b7;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #5f3a00;
+}
+
+/* ── Registrar notes banner ────────────────────────────────────────── */
+
+.registrar-banner {
+  background: #fff8e1;
+  border-left: 4px solid #fbc02d;
+}
+
+/* ── Utility ───────────────────────────────────────────────────────── */
+
+.error-box {
+  text-align: center; padding: 60px 20px; color: #5f6368; font-size: 15px;
+}
+.loading { text-align: center; padding: 60px 20px; color: #80868b; }
+
+#pedigree-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #1a73e8;
+  text-decoration: none;
+}
+#pedigree-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html">← Search</a>
+  <h1 id="page-title">Dog Detail</h1>
+</header>
+
+<main id="main">
+  <div class="loading">Loading…</div>
+</main>
+
+<script>
+"use strict";
+
+const params = new URLSearchParams(location.search);
+const dogId  = parseInt(params.get('id') || '0', 10);
+
+if (!dogId) {
+    document.getElementById('main').innerHTML = '<div class="error-box">No dog ID specified.</div>';
+} else {
+    fetch('api.php?type=dog&id=' + dogId)
+        .then(r => r.json())
+        .then(render)
+        .catch(() => {
+            document.getElementById('main').innerHTML =
+                '<div class="error-box">Failed to load — check server connection.</div>';
+        });
+}
+
+function render(data) {
+    if (data.error) {
+        document.getElementById('main').innerHTML =
+            `<div class="error-box">${esc(data.error)}</div>`;
+        return;
+    }
+
+    const { dog, detail, occupations, healthProblems, otherMarkings,
+            pedigree, littermates, fullSiblings, progeny } = data;
+
+    document.title = (dog.name || 'Dog') + ' — ESCR Registry Explorer';
+    document.getElementById('page-title').textContent = dog.name || '(unnamed)';
+
+    let html = '';
+
+    // ── Mast ──────────────────────────────────────────────────────────
+    html += `<div class="mast">
+        <div class="mast-name">${esc(dog.name || '(unnamed)')}</div>
+        <div class="mast-reg">${esc(dog.registrationNumber || '')}</div>
+        <div class="mast-grid">`;
+
+    const mastItems = [
+        ['Sex',          dog.sex],
+        ['Born',         fmtDate(dog.dateOfWhelp)],
+        ['Coat Color',   dog.coatColor],
+        ['Reg. Type',    dog.registrationType],
+        ['Date Reg.',    fmtDate(dog.dateRegistered)],
+        ['Sire',         dog.sireId   ? `<a href="dog.html?id=${dog.sireId}">${esc(dog.sireName||'(unnamed)')}</a>` : null],
+        ['Dam',          dog.damId    ? `<a href="dog.html?id=${dog.damId}">${esc(dog.damName||'(unnamed)')}</a>`   : null],
+        ['Owner',        dog.ownerId  ? `<a href="person.html?id=${dog.ownerId}">${esc(dog.ownerName)}</a>`         : null],
+        ['Breeder',      dog.breederId? `<a href="person.html?id=${dog.breederId}">${esc(dog.breederName)}</a>`     : null],
+        ['Prev. Owner',  dog.previousOwnerId ? `<a href="person.html?id=${dog.previousOwnerId}">${esc(dog.previousOwnerName)}</a>` : null],
+        ['Beneficiary',  dog.beneficiaryId   ? `<a href="person.html?id=${dog.beneficiaryId}">${esc(dog.beneficiaryName)}</a>`    : null],
+        ['Registered By',dog.registeredById  ? `<a href="person.html?id=${dog.registeredById}">${esc(dog.registeredByName)}</a>`  : null],
+    ];
+    for (const [label, val] of mastItems) {
+        if (!val) continue;
+        html += `<div class="mast-item">
+            <span class="mast-label">${esc(label)}</span>
+            <span class="mast-value">${val}</span>
+        </div>`;
+    }
+    html += `</div></div>`;
+
+    // ── Registration ──────────────────────────────────────────────────
+    if (detail) {
+        const regRows = [];
+        if (detail.callNames)               regRows.push(['Call Name(s)',       esc(detail.callNames)]);
+        if (detail.ukcRegistrationNumber)   regRows.push(['UKC Reg #',          esc(detail.ukcRegistrationNumber) + (detail.ukcRegisteredName ? ' — ' + esc(detail.ukcRegisteredName) : '')]);
+        if (detail.iesrRegistrationNumber)  regRows.push(['IESR Reg #',         esc(detail.iesrRegistrationNumber) + (detail.iesrRegisteredName ? ' — ' + esc(detail.iesrRegisteredName) : '')]);
+        if (detail.arfRegistrationNumber)   regRows.push(['ARF Reg #',          esc(detail.arfRegistrationNumber) + (detail.arfRegisteredName ? ' — ' + esc(detail.arfRegisteredName) : '')]);
+        if (detail.nkcRegistrationNumber)   regRows.push(['NKC Reg #',          esc(detail.nkcRegistrationNumber) + (detail.nkcRegisteredName ? ' — ' + esc(detail.nkcRegisteredName) : '')]);
+        if (detail.otherRegistrationNumber) regRows.push(['Other Reg #',        esc(detail.otherRegistrationNumber) + (detail.otherRegisteredName ? ' — ' + esc(detail.otherRegisteredName) : '')]);
+        if (detail.microchipNumber)         regRows.push(['Microchip',          esc(detail.microchipNumber) + (detail.microchipTypeText ? ' (' + esc(detail.microchipTypeText) + ')' : '') + (detail.microchipRegistryText ? ', ' + esc(detail.microchipRegistryText) : '')]);
+        if (detail.tattooNumber)            regRows.push(['Tattoo',             esc(detail.tattooNumber) + (detail.tattooRegistry ? ' (' + esc(detail.tattooRegistry) + ')' : '')]);
+        if (regRows.length) {
+            html += section('Registration', kvGrid(regRows));
+        }
+    }
+
+    // ── Health ────────────────────────────────────────────────────────
+    if (detail) {
+        const healthRows = [];
+        if (detail.ofaHipsResultText)      healthRows.push(['OFA Hips',          esc(detail.ofaHipsResultText)   + ageStr(detail.ofaHipsAgeInMonths)]);
+        if (detail.ofaElbowsResultText)    healthRows.push(['OFA Elbows',        esc(detail.ofaElbowsResultText) + ageStr(detail.ofaElbowsAgeInMonths)]);
+        if (detail.pennHIPDILeft || detail.pennHIPDIRight)
+                                           healthRows.push(['PennHIP DI (L/R)',  [detail.pennHIPDILeft, detail.pennHIPDIRight].filter(Boolean).map(esc).join(' / ') + ageStr(detail.pennHIPAgeInMonths)]);
+        if (detail.pennHIPDJDLeftText || detail.pennHIPDJDRightText)
+                                           healthRows.push(['PennHIP DJD (L/R)', [detail.pennHIPDJDLeftText, detail.pennHIPDJDRightText].filter(Boolean).map(esc).join(' / ')]);
+        if (detail.pennHIPCavLeftText || detail.pennHIPCavRightText)
+                                           healthRows.push(['PennHIP Cav. (L/R)',[detail.pennHIPCavLeftText, detail.pennHIPCavRightText].filter(Boolean).map(esc).join(' / ')]);
+        if (detail.gdcHipsResult)          healthRows.push(['GDC Hips',          esc(detail.gdcHipsResult)       + ageStr(detail.gdcHipsAgeInMonths)]);
+        if (detail.cerfResultText)         healthRows.push(['CERF',              esc(detail.cerfResultText)      + ageStr(detail.cerfAgeInMonths)]);
+        if (detail.mdr1ResultText)         healthRows.push(['MDR1',              esc(detail.mdr1ResultText)      + ageStr(detail.mdr1GeneticMutationAgeInMonths)]);
+        if (detail.otherRadiographicHipsResult)
+                                           healthRows.push(['Other Radiographic Hips', esc(detail.otherRadiographicHipsResult) + ageStr(detail.otherRadiographicHipsAgeInMonths)]);
+        if (healthProblems.length)         healthRows.push(['Health Problems',   healthProblems.map(h => `<span class="tag tag-neutral">${esc(h)}</span>`).join('')]);
+        if (detail.otherHealthInformation) healthRows.push(['Other Health Info', esc(detail.otherHealthInformation)]);
+
+        if (healthRows.length) {
+            html += section('Health', `<table class="health-table">${healthRows.map(([l,v]) =>
+                `<tr><td>${esc(l)}</td><td>${v}</td></tr>`).join('')}</table>`);
+        }
+    }
+
+    // ── Physical ──────────────────────────────────────────────────────
+    if (detail) {
+        const physRows = [];
+        if (detail.adultHeight)           physRows.push(['Height',        esc(detail.adultHeight + '"') + ageStr(detail.adultHeightAgeInMonths)]);
+        if (detail.adultWeight)           physRows.push(['Weight',        esc(detail.adultWeight + ' lbs') + ageStr(detail.adultWeightAgeInMonths)]);
+        if (detail.detailCoatColorText)   physRows.push(['Coat Color',    esc(detail.detailCoatColorText)]);
+        if (detail.whiteMarkingsText)     physRows.push(['White Markings',esc(detail.whiteMarkingsText)]);
+        if (otherMarkings.length)         physRows.push(['Other Markings',otherMarkings.map(m => `<span class="tag tag-neutral">${esc(m)}</span>`).join('')]);
+        if (detail.tailText)              physRows.push(['Tail',          esc(detail.tailText)]);
+        if (detail.blueEyesText)          physRows.push(['Blue Eyes',     esc(detail.blueEyesText)]);
+        if (detail.rearDewClawsText)      physRows.push(['Rear Dew Claws',esc(detail.rearDewClawsText)]);
+        if (detail.spayNeuterIntactText)  physRows.push(['Spay/Neuter',   esc(detail.spayNeuterIntactText) + ageStr(detail.spayNeuterAgeInMonths)]);
+        if (physRows.length) {
+            html += section('Physical', kvGrid(physRows));
+        }
+    }
+
+    // ── Working & Occupations ─────────────────────────────────────────
+    if (detail) {
+        const workRows = [];
+        if (detail.farmOrRanchDogText)    workRows.push(['Farm/Ranch Dog', esc(detail.farmOrRanchDogText)]);
+        if (occupations.length)           workRows.push(['Occupations',    occupations.map(o => `<span class="tag">${esc(o)}</span>`).join('')]);
+        const livestock = [
+            ['Dairy Cattle', detail.dairyCattle], ['Beef Cattle', detail.beefCattle],
+            ['Sheep', detail.sheep], ['Goats', detail.goats], ['Hogs', detail.hogs],
+            ['Horses', detail.horses], ['Poultry', detail.poultry],
+        ].filter(([,n]) => n);
+        if (livestock.length)             workRows.push(['Livestock', livestock.map(([l,n]) => `<span class="tag tag-neutral">${esc(l)}: ${esc(n)}</span>`).join('')]);
+        if (workRows.length) {
+            html += section('Working &amp; Occupations', kvGrid(workRows));
+        }
+    }
+
+    // ── Titles & Activities ───────────────────────────────────────────
+    if (detail) {
+        const titleRows = [
+            ['AWFA',            detail.awfaTitles],
+            ['Herding',         detail.herdingTitles],
+            ['SAR',             detail.sarTitles],
+            ['Obedience',       detail.obedienceTitles],
+            ['Rally/Obedience', detail.rallyObedienceTitles],
+            ['Freestyle',       detail.freestyleTitles],
+            ['Agility',         detail.agilityTitles],
+            ['Flyball',         detail.flyballTitles],
+            ['Temperament',     detail.temperamentTitles],
+            ['Therapy',         detail.therapyTitles],
+            ['CGC/CGN',         detail.cgcCgnTitles],
+            ['Protection',      detail.protectionTitles],
+            ['Other',           detail.otherTitles],
+        ].filter(([,v]) => v);
+        if (titleRows.length) {
+            html += section('Titles &amp; Activities', kvGrid(titleRows.map(([l,v]) => [l, esc(v)])));
+        }
+    }
+
+    // ── 3-gen Pedigree ────────────────────────────────────────────────
+    html += section('3-Generation Pedigree', renderPedigree(pedigree, dog));
+
+    // ── Littermates ───────────────────────────────────────────────────
+    if (littermates.length) {
+        html += section('Littermates', dogListTable(littermates));
+    }
+
+    // ── Full Siblings ─────────────────────────────────────────────────
+    if (fullSiblings.length) {
+        html += section('Full Siblings', dogListTable(fullSiblings, true));
+    }
+
+    // ── Progeny ───────────────────────────────────────────────────────
+    if (progeny.length) {
+        html += section('Progeny', renderProgeny(progeny));
+    }
+
+    // ── Photos ────────────────────────────────────────────────────────
+    html += section('Photos', renderPhotos(dog.id, detail));
+
+    // ── Owner's Description ───────────────────────────────────────────
+    if (detail && detail.ownersDescription) {
+        html += section("Owner's Description", `<div class="free-text">${esc(detail.ownersDescription)}</div>`);
+    }
+
+    // ── Registrar Notes ───────────────────────────────────────────────
+    if (detail && detail.registrarsComment) {
+        html += `<div class="section registrar-banner">
+            <div class="section-head">Registrar Notes <span style="font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">(internal — not public)</span></div>
+            <div class="section-body"><div class="free-text">${esc(detail.registrarsComment)}</div></div>
+        </div>`;
+    }
+
+    document.getElementById('main').innerHTML = html;
+}
+
+// ── Rendering helpers ─────────────────────────────────────────────────
+
+function section(title, body) {
+    return `<div class="section">
+        <div class="section-head">${title}</div>
+        <div class="section-body">${body}</div>
+    </div>`;
+}
+
+function kvGrid(rows) {
+    return `<div class="kv-grid">${rows.map(([l,v]) =>
+        `<span class="kv-label">${typeof l === 'string' && l.includes('<') ? l : esc(l)}</span><span class="kv-value">${v}</span>`
+    ).join('')}</div>`;
+}
+
+function dogListTable(dogs, showDate) {
+    let html = `<table class="dog-table"><thead><tr>
+        <th>Name</th><th>Reg #</th><th>Sex</th>${showDate ? '<th>Born</th>' : ''}
+    </tr></thead><tbody>`;
+    for (const d of dogs) {
+        html += `<tr>
+            <td><a href="dog.html?id=${d.id}">${esc(d.name||'(unnamed)')}</a></td>
+            <td>${esc(d.registrationNumber||'—')}</td>
+            <td>${esc(d.sex||'—')}</td>
+            ${showDate ? `<td>${fmtDate(d.dateOfWhelp)||'—'}</td>` : ''}
+        </tr>`;
+    }
+    html += `</tbody></table>`;
+    return html;
+}
+
+function renderProgeny(progeny) {
+    // Group by litterId
+    const groups = new Map();
+    for (const p of progeny) {
+        const key = p.litterId;
+        if (!groups.has(key)) groups.set(key, { litterId: p.litterId, dateOfWhelp: p.dateOfWhelp, damId: p.damId, damName: p.damName, damReg: p.damReg, pups: [] });
+        groups.get(key).pups.push(p);
+    }
+    let html = '';
+    for (const g of groups.values()) {
+        const damLink = g.damId ? `<a href="dog.html?id=${g.damId}">${esc(g.damName||'(unnamed)')}</a>` : '(unknown dam)';
+        const dateStr = g.dateOfWhelp ? ' — whelped ' + fmtDate(g.dateOfWhelp) : '';
+        html += `<div class="progeny-group">
+            <div class="progeny-group-head">Dam: ${damLink}${dateStr}</div>
+            <table class="dog-table"><thead><tr><th>Name</th><th>Reg #</th><th>Sex</th></tr></thead><tbody>`;
+        for (const p of g.pups) {
+            html += `<tr>
+                <td><a href="dog.html?id=${p.id}">${esc(p.name||'(unnamed)')}</a></td>
+                <td>${esc(p.registrationNumber||'—')}</td>
+                <td>${esc(p.sex||'—')}</td>
+            </tr>`;
+        }
+        html += `</tbody></table></div>`;
+    }
+    return html;
+}
+
+function renderPedigree(ped, dog) {
+    // Classic box pedigree: Subject | Parents | Grandparents | Great-grandparents
+    function dogLink(entry) {
+        if (!entry) return `<span class="ped-empty">—</span>`;
+        return `<a href="dog.html?id=${entry.id}">${esc(entry.name||'(unnamed)')}</a>`;
+    }
+
+    const rows = [
+        // [label, key] in display order (top=paternal side)
+        { key: 'sire_sire_sire', rowspan: 1 },
+        { key: 'sire_sire_dam',  rowspan: 1 },
+        { key: 'sire_dam_sire',  rowspan: 1 },
+        { key: 'sire_dam_dam',   rowspan: 1 },
+        { key: 'dam_sire_sire',  rowspan: 1 },
+        { key: 'dam_sire_dam',   rowspan: 1 },
+        { key: 'dam_dam_sire',   rowspan: 1 },
+        { key: 'dam_dam_dam',    rowspan: 1 },
+    ];
+
+    // Build table with rowspans
+    let tbl = `<table class="pedigree-table">`;
+
+    // Row 0: sire_sire_sire, sire_sire (spans 2), sire (spans 4), subject (spans 8)
+    // We'll render 8 rows, each with the rightmost cells (gen1, subject) only in first row
+    const gen1 = [
+        {key:'sire_sire',rowspan:2,pos:'P'},
+        {key:'sire_dam',rowspan:2,pos:'P'},
+        {key:'dam_sire',rowspan:2,pos:'M'},
+        {key:'dam_dam',rowspan:2,pos:'M'},
+    ];
+    const gen2 = [
+        {key:'sire',rowspan:4,pos:'P'},
+        {key:'dam',rowspan:4,pos:'M'},
+    ];
+
+    for (let i = 0; i < 8; i++) {
+        tbl += '<tr>';
+        // Gen 3 (great-grandparents) — always shown
+        tbl += `<td>${dogLink(ped[rows[i].key])}</td>`;
+        // Gen 2 (grandparents) — shown at rows 0,2,4,6
+        if (i % 2 === 0) {
+            const gp = gen1[Math.floor(i/2)];
+            tbl += `<td rowspan="2">${dogLink(ped[gp.key])}</td>`;
+        }
+        // Gen 1 (parents) — shown at rows 0,4
+        if (i % 4 === 0) {
+            const p = gen2[Math.floor(i/4)];
+            tbl += `<td rowspan="4">${dogLink(ped[p.key])}</td>`;
+        }
+        // Subject — shown at row 0 only
+        if (i === 0) {
+            tbl += `<td rowspan="8" style="font-weight:600">${esc(dog.name||'(unnamed)')}</td>`;
+        }
+        tbl += '</tr>';
+    }
+    tbl += '</table>';
+
+    tbl += `<a id="pedigree-link" href="pedigree.html?id=${dog.id}">View 5-generation pedigree →</a>`;
+    return tbl;
+}
+
+function ageStr(months) {
+    if (!months) return '';
+    return ` <span style="color:#5f6368;font-size:12px">(at ${months} mo.)</span>`;
+}
+
+function fmtDate(s) {
+    if (!s) return null;
+    const d = s.split('T')[0];        // strip time if datetime
+    if (!d || d === '0000-00-00') return null;
+    const [y, m, day] = d.split('-');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[parseInt(m,10)-1]} ${parseInt(day,10)}, ${y}`;
+}
+
+// ── Photos ───────────────────────────────────────────────────────────
+
+function renderPhotos(dogId, detail) {
+    // URL pattern: https://www.esc-registry.org/photos/DogId{id}_{n}.{ext}
+    // Extension is not stored; try jpg → jpeg → png in order.
+    const EXTS = ['jpg', 'jpeg', 'png'];
+    const BASE  = 'photos/';
+
+    let html = '<div class="photo-grid" id="photo-grid">';
+    for (let i = 0; i < 10; i++) {
+        const caption  = detail ? (detail['photoCaption' + i] || '') : '';
+        const baseUrl  = BASE + 'DogId' + dogId + '_' + i;
+        const captHtml = caption ? `<div class="photo-caption">${esc(caption)}</div>` : '';
+        // Start with .jpg; onerror falls through other extensions then hides the slot.
+        html += `<div class="photo-item" id="pi-${i}">
+            <img src="${baseUrl}.jpg"
+                 alt="${esc(caption)}"
+                 data-base="${baseUrl}"
+                 data-ext-idx="0"
+                 onload="document.getElementById('pi-${i}').style.display='flex'"
+                 onerror="photoFallback(this)">
+            ${captHtml}
+        </div>`;
+    }
+    html += '</div>';
+    html += `<div class="no-photos" id="no-photos" style="display:none">No photos on record.</div>`;
+    return html;
+}
+
+function photoFallback(img) {
+    const EXTS    = ['jpg', 'jpeg', 'png'];
+    const nextIdx = parseInt(img.dataset.extIdx, 10) + 1;
+    if (nextIdx < EXTS.length) {
+        img.dataset.extIdx = nextIdx;
+        img.src = img.dataset.base + '.' + EXTS[nextIdx];
+    } else {
+        // All extensions exhausted — keep slot hidden; check if all slots failed.
+        img.onerror = null;
+        const allHidden = [...document.querySelectorAll('.photo-item')]
+            .every(el => el.style.display === 'none' || el.style.display === '');
+        if (allHidden) {
+            const noPhotos = document.getElementById('no-photos');
+            if (noPhotos) noPhotos.style.display = 'block';
+        }
+    }
+}
+
+function esc(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Person — ESCR Registry Explorer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  background: #f1f3f4;
+  color: #202124;
+  min-height: 100vh;
+}
+
+header {
+  background: #1a73e8;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header a { color: #fff; text-decoration: none; font-size: 13px; opacity: 0.85; }
+header a:hover { opacity: 1; text-decoration: underline; }
+header h1 { font-size: 18px; font-weight: 600; }
+
+main { max-width: 900px; margin: 0 auto; padding: 32px 20px 60px; }
+
+/* ── Mast ──────────────────────────────────────────────────────────── */
+
+.mast {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  padding: 24px 28px;
+  margin-bottom: 20px;
+}
+.mast-name { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+.mast-sub  { font-size: 14px; color: #5f6368; margin-bottom: 14px; }
+.mast-sub a { color: #1a73e8; text-decoration: none; }
+.mast-sub a:hover { text-decoration: underline; }
+.mast-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f1f3f4;
+  color: #3c4043;
+}
+.chip-blue { background: #e8f0fe; color: #1967d2; }
+
+/* ── Sections ──────────────────────────────────────────────────────── */
+
+.section {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.section-head {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  color: #5f6368; padding: 12px 20px; border-bottom: 1px solid #f1f3f4; background: #f8f9fa;
+}
+.section-body { padding: 16px 20px; }
+
+/* ── Dog table ─────────────────────────────────────────────────────── */
+
+.dog-table { width: 100%; border-collapse: collapse; }
+.dog-table th {
+  text-align: left; padding: 7px 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #5f6368; background: #f8f9fa; border-bottom: 1px solid #dadce0;
+}
+.dog-table td { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #f1f3f4; }
+.dog-table tr:last-child td { border-bottom: none; }
+.dog-table tbody tr:hover { background: #f8f9fa; }
+.dog-table a { color: #1a73e8; text-decoration: none; }
+.dog-table a:hover { text-decoration: underline; }
+
+/* ── Litter groups ─────────────────────────────────────────────────── */
+
+.litter-group { margin-bottom: 20px; }
+.litter-group:last-child { margin-bottom: 0; }
+.litter-head {
+  font-size: 13px; font-weight: 600;
+  padding: 8px 0 8px;
+  border-bottom: 1px solid #dadce0;
+  margin-bottom: 4px;
+  display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline;
+}
+.litter-head a { color: #1a73e8; text-decoration: none; }
+.litter-head a:hover { text-decoration: underline; }
+.litter-meta { font-size: 12px; color: #5f6368; font-weight: 400; }
+
+/* ── Free text ─────────────────────────────────────────────────────── */
+
+.free-text { font-size: 14px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+
+/* ── Registrar notes banner ────────────────────────────────────────── */
+
+.registrar-banner {
+  background: #fff8e1;
+  border-left: 4px solid #fbc02d;
+}
+
+.error-box { text-align: center; padding: 60px 20px; color: #5f6368; font-size: 15px; }
+.loading   { text-align: center; padding: 60px 20px; color: #80868b; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html">← Search</a>
+  <h1 id="page-title">Person</h1>
+</header>
+
+<main id="main">
+  <div class="loading">Loading…</div>
+</main>
+
+<script>
+"use strict";
+
+const params = new URLSearchParams(location.search);
+const personId = parseInt(params.get('id') || '0', 10);
+
+if (!personId) {
+    document.getElementById('main').innerHTML = '<div class="error-box">No person ID specified.</div>';
+} else {
+    fetch('api.php?type=person&id=' + personId)
+        .then(r => r.json())
+        .then(render)
+        .catch(() => {
+            document.getElementById('main').innerHTML =
+                '<div class="error-box">Failed to load — check server connection.</div>';
+        });
+}
+
+function render(data) {
+    if (data.error) {
+        document.getElementById('main').innerHTML = `<div class="error-box">${esc(data.error)}</div>`;
+        return;
+    }
+
+    const { person, dogsOwned, dogsPrev, litterPups } = data;
+    const fullName = [person.givenName, person.familyName].filter(Boolean).join(' ') || '(unnamed)';
+
+    document.title = fullName + ' — ESCR Registry Explorer';
+    document.getElementById('page-title').textContent = fullName;
+
+    let html = '';
+
+    // ── Mast ──────────────────────────────────────────────────────────
+    html += `<div class="mast">
+        <div class="mast-name">${esc(fullName)}</div>`;
+
+    if (person.kennelId) {
+        html += `<div class="mast-sub">Kennel: <a href="kennel.html?id=${person.kennelId}">${esc(person.kennelName)}</a></div>`;
+    }
+
+    const chips = [];
+    if (person.isBreederText) chips.push({ label: person.isBreederText === 'Yes' ? 'Breeder' : 'Non-breeder', blue: person.isBreederText === 'Yes' });
+    if (person.aliveText)     chips.push({ label: person.aliveText, blue: false });
+    if (person.roleText)      chips.push({ label: person.roleText, blue: false });
+
+    if (chips.length) {
+        html += `<div class="mast-chips">${chips.map(c =>
+            `<span class="chip${c.blue ? ' chip-blue' : ''}">${esc(c.label)}</span>`
+        ).join('')}</div>`;
+    }
+
+    html += `</div>`;
+
+    // ── Current Dogs ──────────────────────────────────────────────────
+    if (dogsOwned.length) {
+        html += section(
+            `Dogs Owned <span style="font-weight:400;color:#5f6368">(${dogsOwned.length})</span>`,
+            dogTable(dogsOwned, ['Name', 'Reg #', 'Sex', 'Coat Color', 'Born'])
+        );
+    }
+
+    // ── Previously Owned ──────────────────────────────────────────────
+    if (dogsPrev.length) {
+        html += section(
+            `Previously Owned <span style="font-weight:400;color:#5f6368">(${dogsPrev.length})</span>`,
+            prevDogTable(dogsPrev)
+        );
+    }
+
+    // ── Litters Bred ──────────────────────────────────────────────────
+    if (litterPups.length) {
+        const groups = groupByLitter(litterPups);
+        let body = '';
+        for (const g of groups.values()) {
+            const sireStr = g.sireId
+                ? `Sire: <a href="dog.html?id=${g.sireId}">${esc(g.sireName||'(unnamed)')}</a>`
+                : '';
+            const damStr = g.damId
+                ? `Dam: <a href="dog.html?id=${g.damId}">${esc(g.damName||'(unnamed)')}</a>`
+                : 'Dam: unknown';
+            const dateStr = g.dateOfWhelp ? fmtDate(g.dateOfWhelp) : '';
+            const numStr  = `${g.pups.length} pup${g.pups.length !== 1 ? 's' : ''}`;
+
+            body += `<div class="litter-group">
+                <div class="litter-head">
+                    <span>${damStr}</span>
+                    ${sireStr ? `<span>${sireStr}</span>` : ''}
+                    <span class="litter-meta">${[dateStr, numStr].filter(Boolean).join(' · ')}</span>
+                </div>`;
+
+            body += `<table class="dog-table"><thead><tr>
+                <th>Name</th><th>Reg #</th><th>Sex</th>
+            </tr></thead><tbody>`;
+            for (const p of g.pups) {
+                body += `<tr>
+                    <td><a href="dog.html?id=${p.id}">${esc(p.name||'(unnamed)')}</a></td>
+                    <td>${esc(p.registrationNumber||'—')}</td>
+                    <td>${esc(p.sex||'—')}</td>
+                </tr>`;
+            }
+            body += `</tbody></table></div>`;
+        }
+        html += section(
+            `Litters Bred <span style="font-weight:400;color:#5f6368">(${groups.size} litter${groups.size !== 1 ? 's' : ''})</span>`,
+            body
+        );
+    }
+
+    // ── Registrar's Comments ──────────────────────────────────────────
+    if (person.registrarsComments) {
+        html += `<div class="section registrar-banner">
+            <div class="section-head">Registrar Notes <span style="font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">(internal — not public)</span></div>
+            <div class="section-body"><div class="free-text">${esc(person.registrarsComments)}</div></div>
+        </div>`;
+    }
+
+    // ── Comments ──────────────────────────────────────────────────────
+    if (person.comments) {
+        html += section("Comments", `<div class="free-text">${esc(person.comments)}</div>`);
+    }
+
+    document.getElementById('main').innerHTML = html;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+
+function section(title, body) {
+    return `<div class="section">
+        <div class="section-head">${title}</div>
+        <div class="section-body">${body}</div>
+    </div>`;
+}
+
+function dogTable(dogs) {
+    let html = `<table class="dog-table"><thead><tr>
+        <th>Name</th><th>Reg #</th><th>Sex</th><th>Coat Color</th><th>Born</th>
+    </tr></thead><tbody>`;
+    for (const d of dogs) {
+        html += `<tr>
+            <td><a href="dog.html?id=${d.id}">${esc(d.name||'(unnamed)')}</a></td>
+            <td>${esc(d.registrationNumber||'—')}</td>
+            <td>${esc(d.sex||'—')}</td>
+            <td>${esc(d.coatColor||'—')}</td>
+            <td>${fmtDate(d.dateOfWhelp)||'—'}</td>
+        </tr>`;
+    }
+    html += `</tbody></table>`;
+    return html;
+}
+
+function prevDogTable(dogs) {
+    let html = `<table class="dog-table"><thead><tr>
+        <th>Name</th><th>Reg #</th><th>Sex</th><th>Current Owner</th>
+    </tr></thead><tbody>`;
+    for (const d of dogs) {
+        html += `<tr>
+            <td><a href="dog.html?id=${d.id}">${esc(d.name||'(unnamed)')}</a></td>
+            <td>${esc(d.registrationNumber||'—')}</td>
+            <td>${esc(d.sex||'—')}</td>
+            <td>${d.currentOwnerId
+                ? `<a href="person.html?id=${d.currentOwnerId}">${esc(d.currentOwnerName)}</a>`
+                : '—'}</td>
+        </tr>`;
+    }
+    html += `</tbody></table>`;
+    return html;
+}
+
+function groupByLitter(pups) {
+    const map = new Map();
+    for (const p of pups) {
+        if (!map.has(p.litterId)) {
+            map.set(p.litterId, {
+                litterId: p.litterId, dateOfWhelp: p.dateOfWhelp, litterNumber: p.litterNumber,
+                damId: p.damId, damName: p.damName,
+                sireId: p.sireId, sireName: p.sireName,
+                pups: [],
+            });
+        }
+        map.get(p.litterId).pups.push(p);
+    }
+    return map;
+}
+
+function fmtDate(s) {
+    if (!s) return null;
+    const d = s.split('T')[0];
+    if (!d || d === '0000-00-00') return null;
+    const [y, m, day] = d.split('-');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[parseInt(m,10)-1]} ${parseInt(day,10)}, ${y}`;
+}
+
+function esc(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
