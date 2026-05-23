@@ -98,6 +98,23 @@ main { max-width: 900px; margin: 0 auto; padding: 32px 20px 60px; }
 .litter-head a:hover { text-decoration: underline; }
 .litter-meta { font-size: 12px; color: #5f6368; font-weight: 400; }
 
+/* ── Sort control ──────────────────────────────────────────────────── */
+
+.sort-bar { display: flex; gap: 4px; align-items: center; font-size: 12px; color: #5f6368; }
+.sort-btn {
+  background: none; border: 1px solid #dadce0; border-radius: 4px;
+  padding: 2px 8px; font-size: 12px; cursor: pointer; color: #3c4043;
+}
+.sort-btn.active { background: #e8f0fe; border-color: #1a73e8; color: #1967d2; font-weight: 600; }
+
+/* ── Contact grid ──────────────────────────────────────────────────── */
+
+.contact-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; font-size: 13px; }
+.contact-label { color: #5f6368; white-space: nowrap; padding: 2px 0; }
+.contact-value { padding: 2px 0; }
+.contact-value a { color: #1a73e8; text-decoration: none; }
+.contact-value a:hover { text-decoration: underline; }
+
 /* ── Free text ─────────────────────────────────────────────────────── */
 
 .free-text { font-size: 14px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
@@ -142,13 +159,18 @@ if (!personId) {
         });
 }
 
+let _litterGroups = null;
+let _litterSort   = 'date';
+const _dogSec = {};   // keyed by sectionId → { data, sorts, renderFn, sort }
+
 function render(data) {
     if (data.error) {
         document.getElementById('main').innerHTML = `<div class="error-box">${esc(data.error)}</div>`;
         return;
     }
 
-    const { person, dogsOwned, dogsPrev, litterPups } = data;
+    const { person, phones, emails, addresses,
+            dogsOwned, dogsBeneficiary, dogsPrev, dogsRegisteredBy, litterPups } = data;
     const fullName = [person.givenName, person.familyName].filter(Boolean).join(' ') || '(unnamed)';
 
     document.title = fullName + ' — ESCR Registry Explorer';
@@ -168,6 +190,7 @@ function render(data) {
     if (person.isBreederText) chips.push({ label: person.isBreederText === 'Yes' ? 'Breeder' : 'Non-breeder', blue: person.isBreederText === 'Yes' });
     if (person.aliveText)     chips.push({ label: person.aliveText, blue: false });
     if (person.roleText)      chips.push({ label: person.roleText, blue: false });
+    if (person.publishContactInfo == 0) chips.push({ label: 'Contact private', blue: false });
 
     if (chips.length) {
         html += `<div class="mast-chips">${chips.map(c =>
@@ -177,59 +200,71 @@ function render(data) {
 
     html += `</div>`;
 
+    // ── Contact ───────────────────────────────────────────────────────
+    const contactRows = [];
+    for (const p of phones) {
+        const label = p.role ? `Phone (${p.role})` : 'Phone';
+        contactRows.push([label, esc(p.number || '—')]);
+    }
+    for (const e of emails) {
+        const label = e.role ? `Email (${e.role})` : 'Email';
+        const val = e.emailAddress
+            ? `<a href="mailto:${esc(e.emailAddress)}">${esc(e.emailAddress)}</a>`
+            : '—';
+        contactRows.push([label, val]);
+    }
+    for (const a of addresses) {
+        const label = a.role ? `Address (${a.role})` : 'Address';
+        const parts = [a.streetAddress1, a.streetAddress2].filter(Boolean);
+        const cityLine = [a.city, [a.state, a.postalCode].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+        if (cityLine) parts.push(cityLine);
+        if (a.country) parts.push(a.country);
+        contactRows.push([label, parts.map(esc).join('<br>')]);
+    }
+
+    if (contactRows.length) {
+        let rows = contactRows.map(([label, val]) =>
+            `<div class="contact-label">${label}</div><div class="contact-value">${val}</div>`
+        ).join('');
+        html += section('Contact', `<div class="contact-grid">${rows}</div>`);
+    }
+
     // ── Current Dogs ──────────────────────────────────────────────────
     if (dogsOwned.length) {
-        html += section(
-            `Dogs Owned <span style="font-weight:400;color:#5f6368">(${dogsOwned.length})</span>`,
-            dogTable(dogsOwned, ['Name', 'Reg #', 'Sex', 'Coat Color', 'Born'])
-        );
+        html += sortableDogSection('Dogs Owned', 'owned', dogsOwned,
+            [{key:'name',label:'Name'},{key:'date',label:'Born'}], renderDogTable);
+    }
+
+    // ── Beneficially Owned ────────────────────────────────────────────
+    if (dogsBeneficiary.length) {
+        html += sortableDogSection('Dogs Beneficially Owned', 'beneficiary', dogsBeneficiary,
+            [{key:'name',label:'Name'},{key:'date',label:'Born'}], renderDogTable);
     }
 
     // ── Previously Owned ──────────────────────────────────────────────
     if (dogsPrev.length) {
-        html += section(
-            `Previously Owned <span style="font-weight:400;color:#5f6368">(${dogsPrev.length})</span>`,
-            prevDogTable(dogsPrev)
-        );
+        html += sortableDogSection('Previously Owned', 'prev', dogsPrev,
+            [{key:'name',label:'Name'},{key:'date',label:'Born'}], renderPrevDogTable);
     }
 
     // ── Litters Bred ──────────────────────────────────────────────────
     if (litterPups.length) {
-        const groups = groupByLitter(litterPups);
-        let body = '';
-        for (const g of groups.values()) {
-            const sireStr = g.sireId
-                ? `Sire: <a href="dog.html?id=${g.sireId}">${esc(g.sireName||'(unnamed)')}</a>`
-                : '';
-            const damStr = g.damId
-                ? `Dam: <a href="dog.html?id=${g.damId}">${esc(g.damName||'(unnamed)')}</a>`
-                : 'Dam: unknown';
-            const dateStr = g.dateOfWhelp ? fmtDate(g.dateOfWhelp) : '';
-            const numStr  = `${g.pups.length} pup${g.pups.length !== 1 ? 's' : ''}`;
+        _litterGroups = groupByLitter(litterPups);
+        const total = _litterGroups.size;
+        html += `<div class="section">
+            <div class="section-head" style="display:flex;align-items:center;justify-content:space-between">
+                <span>Litters Bred <span style="font-weight:400;color:#5f6368">(${total} litter${total !== 1 ? 's' : ''})</span></span>
+                ${sortBar('litters', [{key:'date',label:'Date'},{key:'dam',label:'Dam, Date'}], _litterSort)}
+            </div>
+            <div class="section-body" id="body-litters">${renderLitterGroups(_litterGroups, _litterSort)}</div>
+        </div>`;
+    }
 
-            body += `<div class="litter-group">
-                <div class="litter-head">
-                    <span>${damStr}</span>
-                    ${sireStr ? `<span>${sireStr}</span>` : ''}
-                    <span class="litter-meta">${[dateStr, numStr].filter(Boolean).join(' · ')}</span>
-                </div>`;
-
-            body += `<table class="dog-table"><thead><tr>
-                <th>Name</th><th>Reg #</th><th>Sex</th>
-            </tr></thead><tbody>`;
-            for (const p of g.pups) {
-                body += `<tr>
-                    <td><a href="dog.html?id=${p.id}">${esc(p.name||'(unnamed)')}</a></td>
-                    <td>${esc(p.registrationNumber||'—')}</td>
-                    <td>${esc(p.sex||'—')}</td>
-                </tr>`;
-            }
-            body += `</tbody></table></div>`;
-        }
-        html += section(
-            `Litters Bred <span style="font-weight:400;color:#5f6368">(${groups.size} litter${groups.size !== 1 ? 's' : ''})</span>`,
-            body
-        );
+    // ── Dogs Registered ───────────────────────────────────────────────
+    if (dogsRegisteredBy.length) {
+        html += sortableDogSection('Dogs Registered', 'registered', dogsRegisteredBy,
+            [{key:'name',label:'Name'},{key:'date',label:'Born'},{key:'owner',label:'Owner'}],
+            renderRegisteredDogTable);
     }
 
     // ── Registrar's Comments ──────────────────────────────────────────
@@ -246,6 +281,114 @@ function render(data) {
     }
 
     document.getElementById('main').innerHTML = html;
+}
+
+// ── Generic sort machinery ────────────────────────────────────────────
+
+function sortBar(id, sorts, current) {
+    const btns = sorts.map(s =>
+        `<button class="sort-btn${s.key === current ? ' active' : ''}"
+                 id="sortbtn-${id}-${s.key}"
+                 onclick="setSort('${id}','${s.key}')">${s.label}</button>`
+    ).join('');
+    return `<div class="sort-bar">Sort: ${btns}</div>`;
+}
+
+function setSort(id, mode) {
+    if (id === 'litters') {
+        if (mode === _litterSort) return;
+        _litterSort = mode;
+        document.getElementById('body-litters').innerHTML = renderLitterGroups(_litterGroups, mode);
+    } else {
+        const sec = _dogSec[id];
+        if (!sec || mode === sec.sort) return;
+        sec.sort = mode;
+        document.getElementById(`body-${id}`).innerHTML = sec.renderFn(sortedDogs(sec.data, mode));
+    }
+    _dogSec[id] && _dogSec[id].sorts.forEach(s => {
+        document.getElementById(`sortbtn-${id}-${s.key}`)?.classList.toggle('active', s.key === mode);
+    });
+    // also handle litter buttons (different data structure)
+    if (id === 'litters') {
+        document.querySelectorAll(`[id^="sortbtn-litters-"]`).forEach(btn => {
+            btn.classList.toggle('active', btn.id === `sortbtn-litters-${mode}`);
+        });
+    }
+}
+
+function sortableDogSection(title, id, dogs, sorts, renderFn) {
+    _dogSec[id] = { data: dogs, sorts, renderFn, sort: sorts[0].key };
+    return `<div class="section">
+        <div class="section-head" style="display:flex;align-items:center;justify-content:space-between">
+            <span>${title} <span style="font-weight:400;color:#5f6368">(${dogs.length})</span></span>
+            ${sortBar(id, sorts, sorts[0].key)}
+        </div>
+        <div class="section-body" id="body-${id}">${renderFn(dogs)}</div>
+    </div>`;
+}
+
+function sortedDogs(dogs, mode) {
+    const s = [...dogs];
+    if (mode === 'date') {
+        s.sort((a, b) => (a.dateOfWhelp || '').localeCompare(b.dateOfWhelp || '') ||
+                         (a.name || '').localeCompare(b.name || ''));
+    } else if (mode === 'owner') {
+        s.sort((a, b) =>
+            (a.ownerFamilyName || a.currentOwnerName || '').localeCompare(b.ownerFamilyName || b.currentOwnerName || '') ||
+            (a.ownerGivenName  || '').localeCompare(b.ownerGivenName  || '') ||
+            (a.name || '').localeCompare(b.name || ''));
+    } else {
+        s.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+    return s;
+}
+
+function renderDogTable(dogs)        { return dogTable(dogs); }
+function renderPrevDogTable(dogs)    { return prevDogTable(dogs); }
+function renderRegisteredDogTable(dogs) { return registeredDogTable(dogs); }
+
+function renderLitterGroups(groups, sortMode) {
+    let sorted = [...groups.values()];
+    if (sortMode === 'dam') {
+        sorted.sort((a, b) => {
+            const da = (a.damName || '').localeCompare(b.damName || '');
+            if (da !== 0) return da;
+            return (a.dateOfWhelp || '').localeCompare(b.dateOfWhelp || '');
+        });
+    }
+    // default order is date (already sorted from API)
+
+    let body = '';
+    for (const g of sorted) {
+        const sireStr = g.sireId
+            ? `Sire: <a href="dog.html?id=${g.sireId}">${esc(g.sireName||'(unnamed)')}</a>`
+            : '';
+        const damStr = g.damId
+            ? `Dam: <a href="dog.html?id=${g.damId}">${esc(g.damName||'(unnamed)')}</a>`
+            : 'Dam: unknown';
+        const dateStr = g.dateOfWhelp ? fmtDate(g.dateOfWhelp) : '';
+        const numStr  = `${g.pups.length} pup${g.pups.length !== 1 ? 's' : ''}`;
+
+        body += `<div class="litter-group">
+            <div class="litter-head">
+                <span>${damStr}</span>
+                ${sireStr ? `<span>${sireStr}</span>` : ''}
+                <span class="litter-meta">${[dateStr, numStr].filter(Boolean).join(' · ')}</span>
+            </div>`;
+
+        body += `<table class="dog-table"><thead><tr>
+            <th>Name</th><th>Reg #</th><th>Sex</th>
+        </tr></thead><tbody>`;
+        for (const p of g.pups) {
+            body += `<tr>
+                <td><a href="dog.html?id=${p.id}">${esc(p.name||'(unnamed)')}</a></td>
+                <td>${esc(p.registrationNumber||'—')}</td>
+                <td>${esc(p.sex||'—')}</td>
+            </tr>`;
+        }
+        body += `</tbody></table></div>`;
+    }
+    return body;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -267,6 +410,26 @@ function dogTable(dogs) {
             <td>${esc(d.registrationNumber||'—')}</td>
             <td>${esc(d.sex||'—')}</td>
             <td>${esc(d.coatColor||'—')}</td>
+            <td>${fmtDate(d.dateOfWhelp)||'—'}</td>
+        </tr>`;
+    }
+    html += `</tbody></table>`;
+    return html;
+}
+
+function registeredDogTable(dogs) {
+    let html = `<table class="dog-table"><thead><tr>
+        <th>Name</th><th>Reg #</th><th>Sex</th><th>Owner</th><th>Born</th>
+    </tr></thead><tbody>`;
+    for (const d of dogs) {
+        const ownerDisplay = [d.ownerFamilyName, d.ownerGivenName].filter(Boolean).join(', ') || '(unnamed)';
+        html += `<tr>
+            <td><a href="dog.html?id=${d.id}">${esc(d.name||'(unnamed)')}</a></td>
+            <td>${esc(d.registrationNumber||'—')}</td>
+            <td>${esc(d.sex||'—')}</td>
+            <td>${d.ownerId
+                ? `<a href="person.html?id=${d.ownerId}">${esc(ownerDisplay)}</a>`
+                : '—'}</td>
             <td>${fmtDate(d.dateOfWhelp)||'—'}</td>
         </tr>`;
     }

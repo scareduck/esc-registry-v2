@@ -410,6 +410,7 @@ if ($type === 'person') {
 
     $stmt = $pdo->prepare("
         SELECT p.id, p.givenName, p.familyName, p.username, p.comments, p.registrarsComments,
+               p.publishContactInfo,
                k.id   AS kennelId,   k.name AS kennelName,
                yn.text AS isBreederText,
                al.text AS aliveText,
@@ -425,7 +426,38 @@ if ($type === 'person') {
     $person = $stmt->fetch();
     if (!$person) { http_response_code(404); echo json_encode(['error' => 'person not found']); exit; }
 
-    // Dogs currently owned
+    // Contact info (separate tables)
+    $stmt = $pdo->prepare("
+        SELECT tnr.text AS role, tn.number
+        FROM   TelephoneNumber tn
+        LEFT JOIN TelephoneNumberRole tnr ON tnr.code = tn.role
+        WHERE  tn.person = :id ORDER BY tnr.menuOrder
+    ");
+    $stmt->execute([':id' => $id]);
+    $phones = $stmt->fetchAll();
+
+    $stmt = $pdo->prepare("
+        SELECT ear.text AS role, ea.emailAddress
+        FROM   EmailAddress ea
+        LEFT JOIN EmailAddressRole ear ON ear.code = ea.role
+        WHERE  ea.person = :id ORDER BY ear.menuOrder
+    ");
+    $stmt->execute([':id' => $id]);
+    $emails = $stmt->fetchAll();
+
+    $stmt = $pdo->prepare("
+        SELECT par.text AS role, pa.streetAddress1, pa.streetAddress2,
+               pa.city, s.text AS state, c.text AS country, pa.postalCode
+        FROM   PostalAddress pa
+        LEFT JOIN PostalAddressRole par ON par.code = pa.role
+        LEFT JOIN State   s ON s.code = pa.state
+        LEFT JOIN Country c ON c.code = s.countrycode
+        WHERE  pa.person = :id ORDER BY par.menuOrder
+    ");
+    $stmt->execute([':id' => $id]);
+    $addresses = $stmt->fetchAll();
+
+    // Dogs currently owned (displayOrder IS NOT NULL filters out informal/unregistered entries)
     $stmt = $pdo->prepare("
         SELECT d.id, d.name, d.registrationNumber, sx.text AS sex,
                cc.text AS coatColor, l.dateOfWhelp
@@ -434,11 +466,26 @@ if ($type === 'person') {
         LEFT JOIN CoatColor cc ON cc.code = d.coatColor
         LEFT JOIN Breeding  b  ON b.id   = d.breeding
         LEFT JOIN Litter    l  ON l.id   = b.litter
-        WHERE  d.owner = :id
+        WHERE  d.owner = :id AND d.displayOrder IS NOT NULL
         ORDER  BY d.name
     ");
     $stmt->execute([':id' => $id]);
     $dogsOwned = $stmt->fetchAll();
+
+    // Dogs beneficially owned
+    $stmt = $pdo->prepare("
+        SELECT d.id, d.name, d.registrationNumber, sx.text AS sex,
+               cc.text AS coatColor, l.dateOfWhelp
+        FROM   Dog d
+        LEFT JOIN Sex      sx ON sx.code = d.sex
+        LEFT JOIN CoatColor cc ON cc.code = d.coatColor
+        LEFT JOIN Breeding  b  ON b.id   = d.breeding
+        LEFT JOIN Litter    l  ON l.id   = b.litter
+        WHERE  d.beneficiary = :id AND d.displayOrder IS NOT NULL
+        ORDER  BY d.name
+    ");
+    $stmt->execute([':id' => $id]);
+    $dogsBeneficiary = $stmt->fetchAll();
 
     // Dogs previously owned
     $stmt = $pdo->prepare("
@@ -448,13 +495,31 @@ if ($type === 'person') {
         FROM   Dog d
         LEFT JOIN Sex    sx ON sx.code = d.sex
         LEFT JOIN Person po ON po.id   = d.owner
-        WHERE  d.previousOwner = :id
+        WHERE  d.previousOwner = :id AND d.displayOrder IS NOT NULL
         ORDER  BY d.name
     ");
     $stmt->execute([':id' => $id]);
     $dogsPrev = $stmt->fetchAll();
     foreach ($dogsPrev as &$d) { $d['currentOwnerName'] = trim($d['currentOwnerName']) ?: null; }
     unset($d);
+
+    // Dogs registered by this person
+    $stmt = $pdo->prepare("
+        SELECT d.id, d.name, d.registrationNumber, sx.text AS sex,
+               l.dateOfWhelp,
+               d.owner AS ownerId,
+               po.givenName AS ownerGivenName,
+               po.familyName AS ownerFamilyName
+        FROM   Dog d
+        LEFT JOIN Sex      sx ON sx.code = d.sex
+        LEFT JOIN Breeding  b  ON b.id   = d.breeding
+        LEFT JOIN Litter    l  ON l.id   = b.litter
+        LEFT JOIN Person   po ON po.id   = d.owner
+        WHERE  d.registeredBy = :id
+        ORDER  BY d.name
+    ");
+    $stmt->execute([':id' => $id]);
+    $dogsRegisteredBy = $stmt->fetchAll();
 
     // Litters bred: return pups with litter context so JS can group them
     $stmt = $pdo->prepare("
@@ -475,10 +540,15 @@ if ($type === 'person') {
     $litterPups = $stmt->fetchAll();
 
     echo json_encode([
-        'person'       => $person,
-        'dogsOwned'    => $dogsOwned,
-        'dogsPrev'     => $dogsPrev,
-        'litterPups'   => $litterPups,
+        'person'           => $person,
+        'phones'           => $phones,
+        'emails'           => $emails,
+        'addresses'        => $addresses,
+        'dogsOwned'        => $dogsOwned,
+        'dogsBeneficiary'  => $dogsBeneficiary,
+        'dogsPrev'         => $dogsPrev,
+        'dogsRegisteredBy' => $dogsRegisteredBy,
+        'litterPups'       => $litterPups,
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
