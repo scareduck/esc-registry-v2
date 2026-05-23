@@ -59,68 +59,98 @@ if ($type === 'search') {
     }
 
     $limit = min(max((int)($_GET['limit'] ?? 5), 1), 50);
+    $fetch = $limit + 1;   // fetch one extra to detect has_more
 
-    // Escape LIKE metacharacters so user input is treated literally.
-    $eq     = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q);
-    $like   = '%' . $eq . '%';
-    $prefix = $eq . '%';
-    $fetch  = $limit + 1;   // fetch one extra to detect has_more
+    // Split query into tokens (max 5) so "Rebecca W" matches across name fields.
+    // Each token is LIKE-escaped; the full escaped query is kept for reg# / kennel matching.
+    $tokens = array_map(
+        fn($t) => str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $t),
+        array_slice(preg_split('/\s+/', $q, -1, PREG_SPLIT_NO_EMPTY), 0, 5)
+    );
+    $full_eq = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q);
 
-    // --- Dogs: match on name or registration number ---
-    // Priority: reg# prefix > name prefix > substring anywhere
+    // --- Dogs: all tokens must appear in name, OR full query matches reg# ---
+    // Priority: reg# prefix > name starts with first token > substring
+    $dog_name_conds = [];
+    $dog_params     = [];
+    foreach ($tokens as $i => $tok) {
+        $dog_params[":dn{$i}"] = '%' . $tok . '%';
+        $dog_name_conds[]      = "d.name LIKE :dn{$i}";
+    }
+    $dog_where = '(' . implode(' AND ', $dog_name_conds) . ') OR d.registrationNumber LIKE :reg_like';
+
     $stmt = $pdo->prepare("
         SELECT d.id,
                d.name,
                d.registrationNumber,
-               s.text                                                              AS sex,
+               s.text                                                                   AS sex,
                TRIM(CONCAT(COALESCE(p.givenName, ''), ' ', COALESCE(p.familyName, ''))) AS ownerName,
-               p.id                                                                AS ownerId
+               p.id                                                                     AS ownerId
         FROM   Dog    d
         LEFT JOIN Sex    s ON s.code = d.sex
         LEFT JOIN Person p ON p.id   = d.owner
-        WHERE  d.name LIKE :like OR d.registrationNumber LIKE :like
+        WHERE  $dog_where
         ORDER BY
-            CASE WHEN d.registrationNumber LIKE :prefix THEN 0
-                 WHEN d.name               LIKE :prefix THEN 1
+            CASE WHEN d.registrationNumber LIKE :reg_prefix  THEN 0
+                 WHEN d.name               LIKE :name_prefix THEN 1
                  ELSE 2 END,
             d.name
         LIMIT  :lim
     ");
-    $stmt->bindValue(':like',   $like,   PDO::PARAM_STR);
-    $stmt->bindValue(':prefix', $prefix, PDO::PARAM_STR);
-    $stmt->bindValue(':lim',    $fetch,  PDO::PARAM_INT);
+    foreach ($dog_params as $k => $v) $stmt->bindValue($k, $v, PDO::PARAM_STR);
+    $stmt->bindValue(':reg_like',    '%' . $full_eq . '%', PDO::PARAM_STR);
+    $stmt->bindValue(':reg_prefix',  $full_eq . '%',       PDO::PARAM_STR);
+    $stmt->bindValue(':name_prefix', $tokens[0] . '%',     PDO::PARAM_STR);
+    $stmt->bindValue(':lim',         $fetch,                PDO::PARAM_INT);
     $stmt->execute();
     $dogs      = $stmt->fetchAll();
     $more_dogs = count($dogs) > $limit;
     if ($more_dogs) array_pop($dogs);
-    foreach ($dogs as &$d) {
-        $d['ownerName'] = $d['ownerName'] ?: null;
-    }
+    foreach ($dogs as &$d) { $d['ownerName'] = $d['ownerName'] ?: null; }
     unset($d);
 
-    // --- People: match on either name part ---
-    // Priority: family name prefix > given name prefix > substring
+    // --- People: all tokens must appear in givenName OR familyName (cross-field) ---
+    // "Rebecca W" matches givenName LIKE '%Rebecca%' AND familyName LIKE '%W%'.
+    // Priority: last token matches family name prefix > first token matches given name prefix.
+    $ppl_conds  = [];
+    $ppl_params = [];
+    foreach ($tokens as $i => $tok) {
+        $ppl_params[":pgn{$i}"] = '%' . $tok . '%';
+        $ppl_params[":pfn{$i}"] = '%' . $tok . '%';
+        $ppl_conds[] = "(p.givenName LIKE :pgn{$i} OR p.familyName LIKE :pfn{$i})";
+    }
+    $ppl_where = implode(' AND ', $ppl_conds);
+
     $stmt = $pdo->prepare("
         SELECT p.id, p.givenName, p.familyName, k.name AS kennel
         FROM   Person p
         LEFT JOIN Kennel k ON k.id = p.kennel
-        WHERE  p.familyName LIKE :like OR p.givenName LIKE :like
+        WHERE  $ppl_where
         ORDER BY
-            CASE WHEN p.familyName LIKE :prefix THEN 0
-                 WHEN p.givenName  LIKE :prefix THEN 1
+            CASE WHEN p.familyName LIKE :fam_prefix   THEN 0
+                 WHEN p.givenName  LIKE :given_prefix  THEN 1
                  ELSE 2 END,
             p.familyName, p.givenName
         LIMIT  :lim
     ");
-    $stmt->bindValue(':like',   $like,   PDO::PARAM_STR);
-    $stmt->bindValue(':prefix', $prefix, PDO::PARAM_STR);
-    $stmt->bindValue(':lim',    $fetch,  PDO::PARAM_INT);
+    foreach ($ppl_params as $k => $v) $stmt->bindValue($k, $v, PDO::PARAM_STR);
+    $stmt->bindValue(':fam_prefix',   end($tokens) . '%', PDO::PARAM_STR);
+    $stmt->bindValue(':given_prefix', $tokens[0] . '%',   PDO::PARAM_STR);
+    $stmt->bindValue(':lim',          $fetch,              PDO::PARAM_INT);
     $stmt->execute();
     $people      = $stmt->fetchAll();
     $more_people = count($people) > $limit;
     if ($more_people) array_pop($people);
 
-    // --- Kennels: match on name; surface one associated person ---
+    // --- Kennels: all tokens must appear in name ---
+    $ken_conds  = [];
+    $ken_params = [];
+    foreach ($tokens as $i => $tok) {
+        $ken_params[":kn{$i}"] = '%' . $tok . '%';
+        $ken_conds[]           = "k.name LIKE :kn{$i}";
+    }
+    $ken_where = implode(' AND ', $ken_conds);
+
     $stmt = $pdo->prepare("
         SELECT k.id,
                k.name,
@@ -129,22 +159,20 @@ if ($type === 'search') {
                 WHERE  p2.kennel = k.id
                 LIMIT  1) AS primaryPerson
         FROM   Kennel k
-        WHERE  k.name LIKE :like
+        WHERE  $ken_where
         ORDER BY
-            CASE WHEN k.name LIKE :prefix THEN 0 ELSE 1 END,
+            CASE WHEN k.name LIKE :ken_prefix THEN 0 ELSE 1 END,
             k.name
         LIMIT  :lim
     ");
-    $stmt->bindValue(':like',   $like,   PDO::PARAM_STR);
-    $stmt->bindValue(':prefix', $prefix, PDO::PARAM_STR);
-    $stmt->bindValue(':lim',    $fetch,  PDO::PARAM_INT);
+    foreach ($ken_params as $k => $v) $stmt->bindValue($k, $v, PDO::PARAM_STR);
+    $stmt->bindValue(':ken_prefix', $tokens[0] . '%', PDO::PARAM_STR);
+    $stmt->bindValue(':lim',        $fetch,            PDO::PARAM_INT);
     $stmt->execute();
     $kennels      = $stmt->fetchAll();
     $more_kennels = count($kennels) > $limit;
     if ($more_kennels) array_pop($kennels);
-    foreach ($kennels as &$k) {
-        $k['primaryPerson'] = $k['primaryPerson'] ?: null;
-    }
+    foreach ($kennels as &$k) { $k['primaryPerson'] = $k['primaryPerson'] ?: null; }
     unset($k);
 
     echo json_encode([
