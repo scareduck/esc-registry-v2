@@ -457,7 +457,7 @@ if ($type === 'person') {
     $stmt->execute([':id' => $id]);
     $addresses = $stmt->fetchAll();
 
-    // Dogs currently owned (displayOrder IS NOT NULL filters out informal/unregistered entries)
+    // Dogs currently owned
     $stmt = $pdo->prepare("
         SELECT d.id, d.name, d.registrationNumber, sx.text AS sex,
                cc.text AS coatColor, l.dateOfWhelp
@@ -466,7 +466,7 @@ if ($type === 'person') {
         LEFT JOIN CoatColor cc ON cc.code = d.coatColor
         LEFT JOIN Breeding  b  ON b.id   = d.breeding
         LEFT JOIN Litter    l  ON l.id   = b.litter
-        WHERE  d.owner = :id AND d.displayOrder IS NOT NULL
+        WHERE  d.owner = :id
         ORDER  BY d.name
     ");
     $stmt->execute([':id' => $id]);
@@ -481,7 +481,7 @@ if ($type === 'person') {
         LEFT JOIN CoatColor cc ON cc.code = d.coatColor
         LEFT JOIN Breeding  b  ON b.id   = d.breeding
         LEFT JOIN Litter    l  ON l.id   = b.litter
-        WHERE  d.beneficiary = :id AND d.displayOrder IS NOT NULL
+        WHERE  d.beneficiary = :id
         ORDER  BY d.name
     ");
     $stmt->execute([':id' => $id]);
@@ -495,7 +495,7 @@ if ($type === 'person') {
         FROM   Dog d
         LEFT JOIN Sex    sx ON sx.code = d.sex
         LEFT JOIN Person po ON po.id   = d.owner
-        WHERE  d.previousOwner = :id AND d.displayOrder IS NOT NULL
+        WHERE  d.previousOwner = :id
         ORDER  BY d.name
     ");
     $stmt->execute([':id' => $id]);
