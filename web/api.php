@@ -779,14 +779,17 @@ if ($type === 'litter') {
 
 if ($type === 'litter-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true);
-    $litterNumber = (int)($body['litterNumber'] ?? 0);
-    if ($litterNumber <= 0) {
-        http_response_code(400); echo json_encode(['error' => 'litter number required']); exit;
+    $raw = $body['litterNumber'] ?? null;
+    $litterNumber = ($raw !== null && $raw !== '') ? (int)$raw : null;
+    if ($litterNumber !== null && $litterNumber <= 0) {
+        http_response_code(400); echo json_encode(['error' => 'litter number must be positive']); exit;
     }
-    $dup = $pdo->prepare("SELECT id FROM Litter WHERE litterNumber = :n");
-    $dup->execute([':n' => $litterNumber]);
-    if ($dup->fetch()) {
-        echo json_encode(['error' => "Litter number {$litterNumber} already exists"]); exit;
+    if ($litterNumber !== null) {
+        $dup = $pdo->prepare("SELECT id FROM Litter WHERE litterNumber = :n");
+        $dup->execute([':n' => $litterNumber]);
+        if ($dup->fetch()) {
+            echo json_encode(['error' => "Litter number {$litterNumber} already exists"]); exit;
+        }
     }
     try {
         $pdo->beginTransaction();

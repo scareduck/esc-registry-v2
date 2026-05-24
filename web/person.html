@@ -369,7 +369,7 @@ function renderLitterGroups(groups, sortMode) {
         const dateStr = g.dateOfWhelp ? fmtDate(g.dateOfWhelp) : '';
         const numStr  = `${g.pups.length} pup${g.pups.length !== 1 ? 's' : ''}`;
         const litLink = g.litterId
-            ? `<a href="litter.html?id=${g.litterId}" class="litter-meta">ESC-L${g.litterNumber}</a>`
+            ? `<a href="litter.html?id=${g.litterId}" class="litter-meta">${g.litterNumber ? 'ESC-L' + g.litterNumber : 'Unregistered Litter'}</a>`
             : '';
 
         body += `<div class="litter-group">

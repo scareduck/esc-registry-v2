@@ -274,9 +274,9 @@ function renderNewForm() {
             <div class="card-head">New Litter</div>
             <div class="card-body">
                 <div class="form-group" style="margin-bottom:16px">
-                    <label class="form-label">Litter Number</label>
+                    <label class="form-label">Litter Number <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">(leave blank if unregistered)</span></label>
                     <input class="form-input" type="number" min="1" id="new-litter-num"
-                           placeholder="e.g. 1042" style="font-size:16px;padding:10px 12px">
+                           placeholder="e.g. 1042 — or leave blank" style="font-size:16px;padding:10px 12px">
                     <div id="new-litter-err" style="color:#d93025;font-size:12px;margin-top:4px;min-height:16px"></div>
                 </div>
                 <div style="display:flex;gap:10px;align-items:center">
@@ -295,8 +295,9 @@ function renderNewForm() {
 
     btn.addEventListener('click', async () => {
         errEl.textContent = '';
-        const n = parseInt(numInput.value, 10);
-        if (!n || n <= 0) { errEl.textContent = 'Enter a valid litter number.'; return; }
+        const raw = numInput.value.trim();
+        const n   = raw ? parseInt(raw, 10) : null;
+        if (raw && (!n || n <= 0)) { errEl.textContent = 'Enter a valid positive number, or leave blank for an unregistered litter.'; return; }
 
         btn.disabled = true; btn.textContent = 'Creating…';
         try {
@@ -323,7 +324,7 @@ function renderNewForm() {
 function render() {
     const l = _litter;
     const b = _breedings[0] || {};
-    const litterCode = 'ESC-L' + l.litterNumber;
+    const litterCode = l.litterNumber ? 'ESC-L' + l.litterNumber : 'Unregistered Litter';
 
     document.title = 'Edit ' + litterCode + ' — ESCR Registry Explorer';
     document.getElementById('page-title').textContent = 'Edit ' + litterCode;

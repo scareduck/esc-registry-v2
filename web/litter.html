@@ -205,7 +205,7 @@ function render(data) {
     const b = breedings[0] || {};   // primary breeding (first/only for most litters)
     const dual = breedings.length > 1;
 
-    const litterCode = 'ESC-L' + litter.litterNumber;
+    const litterCode = litter.litterNumber ? 'ESC-L' + litter.litterNumber : 'Unregistered Litter';
     document.title = litterCode + ' — ESCR Registry Explorer';
     document.getElementById('page-title').textContent = litterCode;
 
@@ -290,7 +290,9 @@ function render(data) {
     if (pups.length) {
         let pupHtml = '';
         for (const p of pups) {
-            const code = litterCode + (p.puppyLetter || '');
+            const code = litter.litterNumber
+                ? litterCode + (p.puppyLetter || '')
+                : (p.puppyLetter ? 'Pup ' + p.puppyLetter : '(pup)');
             const reg  = p.registrationNumber ? 'ESC-' + p.registrationNumber : '';
             const chip = [p.microchipNumber, p.microchipTypeText].filter(Boolean).join(' · ');
 
