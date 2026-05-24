@@ -171,7 +171,6 @@ main { max-width: 960px; margin: 0 auto; padding: 32px 20px 60px; }
 <header>
   <a href="index.html">← Search</a>
   <h1 id="page-title">Litter</h1>
-  <a id="edit-link" href="#" style="margin-left:auto;background:rgba(255,255,255,.18);padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s">Edit</a>
 </header>
 
 <main id="main">
@@ -209,16 +208,15 @@ function render(data) {
     const litterCode = 'ESC-L' + litter.litterNumber;
     document.title = litterCode + ' — ESCR Registry Explorer';
     document.getElementById('page-title').textContent = litterCode;
-    const editLink = document.getElementById('edit-link');
-    editLink.href = 'litter-edit.html?id=' + litter.id;
-    editLink.style.opacity = '1';
-    editLink.style.pointerEvents = 'auto';
 
     let html = '';
 
     // ── Mast ──────────────────────────────────────────────────────────
     html += `<div class="card">
-        <div class="mast-title">${esc(litterCode)}</div>`;
+        <div style="display:flex;align-items:baseline;justify-content:space-between;padding:20px 20px 0">
+            <div class="mast-title" style="padding:0">${esc(litterCode)}</div>
+            <a href="litter-edit.html?id=${litter.id}" style="font-size:13px;color:#1a73e8;text-decoration:none;font-weight:500">Edit</a>
+        </div>`;
     if (litter.dateOfWhelp) {
         html += `<div class="mast-sub">Whelped ${fmtDate(litter.dateOfWhelp)}</div>`;
     }
