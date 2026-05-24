@@ -244,7 +244,7 @@ async function dogSearch(q) {
 
 /* ── Boot ────────────────────────────────────────────────────────────── */
 if (!litterId) {
-    document.getElementById('main').innerHTML = '<div class="error-box">No litter ID specified.</div>';
+    renderNewForm();
 } else {
     Promise.all([
         fetch('api.php?type=litter&id=' + litterId).then(r => r.json()),
@@ -262,6 +262,60 @@ if (!litterId) {
         render();
     }).catch(() => {
         document.getElementById('main').innerHTML = '<div class="error-box">Failed to load — check server connection.</div>';
+    });
+}
+
+/* ── New litter creation form ────────────────────────────────────────── */
+function renderNewForm() {
+    document.title = 'New Litter — ESCR Registry Explorer';
+    document.getElementById('page-title').textContent = 'New Litter';
+    document.getElementById('main').innerHTML = `
+        <div class="card" style="max-width:400px;margin:0 auto">
+            <div class="card-head">New Litter</div>
+            <div class="card-body">
+                <div class="form-group" style="margin-bottom:16px">
+                    <label class="form-label">Litter Number</label>
+                    <input class="form-input" type="number" min="1" id="new-litter-num"
+                           placeholder="e.g. 1042" style="font-size:16px;padding:10px 12px">
+                    <div id="new-litter-err" style="color:#d93025;font-size:12px;margin-top:4px;min-height:16px"></div>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center">
+                    <button class="btn-primary" type="button" id="new-litter-btn">Create litter</button>
+                    <a class="btn-ghost" href="index.html">Cancel</a>
+                </div>
+            </div>
+        </div>`;
+
+    const numInput = document.getElementById('new-litter-num');
+    const errEl    = document.getElementById('new-litter-err');
+    const btn      = document.getElementById('new-litter-btn');
+
+    numInput.focus();
+    numInput.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+
+    btn.addEventListener('click', async () => {
+        errEl.textContent = '';
+        const n = parseInt(numInput.value, 10);
+        if (!n || n <= 0) { errEl.textContent = 'Enter a valid litter number.'; return; }
+
+        btn.disabled = true; btn.textContent = 'Creating…';
+        try {
+            const r = await fetch('api.php?type=litter-create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({litterNumber: n}),
+            }).then(r => r.json());
+
+            if (r.ok) {
+                location.href = 'litter-edit.html?id=' + r.id;
+            } else {
+                errEl.textContent = r.error || 'Creation failed.';
+                btn.disabled = false; btn.textContent = 'Create litter';
+            }
+        } catch {
+            errEl.textContent = 'Network error.';
+            btn.disabled = false; btn.textContent = 'Create litter';
+        }
     });
 }
 

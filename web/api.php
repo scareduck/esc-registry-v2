@@ -773,6 +773,36 @@ if ($type === 'litter') {
     exit;
 }
 
+// ── Litter create ────────────────────────────────────────────────────
+// POST ?type=litter-create   body: {litterNumber}
+// Inserts a blank Litter + Breeding row, returns {ok, id}.
+
+if ($type === 'litter-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body = json_decode(file_get_contents('php://input'), true);
+    $litterNumber = (int)($body['litterNumber'] ?? 0);
+    if ($litterNumber <= 0) {
+        http_response_code(400); echo json_encode(['error' => 'litter number required']); exit;
+    }
+    $dup = $pdo->prepare("SELECT id FROM Litter WHERE litterNumber = :n");
+    $dup->execute([':n' => $litterNumber]);
+    if ($dup->fetch()) {
+        echo json_encode(['error' => "Litter number {$litterNumber} already exists"]); exit;
+    }
+    try {
+        $pdo->beginTransaction();
+        $pdo->prepare("INSERT INTO Litter (litterNumber) VALUES (:n)")->execute([':n' => $litterNumber]);
+        $newId = (int)$pdo->lastInsertId();
+        $pdo->prepare("INSERT INTO Breeding (litter) VALUES (:lid)")->execute([':lid' => $newId]);
+        $pdo->commit();
+        echo json_encode(['ok' => true, 'id' => $newId]);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // ── Lookup tables ────────────────────────────────────────────────────
 // ?type=lookups
 // Returns small lookup tables for editor selects.
