@@ -288,6 +288,7 @@ function render(data) {
         ['Coat Color',   dog.coatColor],
         ['Reg. Type',    dog.registrationType],
         ['Date Reg.',    fmtDate(dog.dateRegistered)],
+        ['Litter',       dog.litterId ? `<a href="litter.html?id=${dog.litterId}">ESC-L${esc(dog.litterNumber)}</a>` : null],
         ['Sire',         dog.sireId   ? `<a href="dog.html?id=${dog.sireId}">${esc(dog.sireName||'(unnamed)')}</a>` : null],
         ['Dam',          dog.damId    ? `<a href="dog.html?id=${dog.damId}">${esc(dog.damName||'(unnamed)')}</a>`   : null],
         ['Owner',        dog.ownerId  ? `<a href="person.html?id=${dog.ownerId}">${esc(dog.ownerName)}</a>`         : null],
@@ -406,7 +407,10 @@ function render(data) {
 
     // ── Littermates ───────────────────────────────────────────────────
     if (littermates.length) {
-        html += section('Littermates', dogListTable(littermates));
+        const litLink = dog.litterId
+            ? ` <a href="litter.html?id=${dog.litterId}" style="font-weight:400;font-size:12px;text-transform:none;letter-spacing:0;color:#1a73e8">ESC-L${esc(dog.litterNumber)}</a>`
+            : '';
+        html += section(`Littermates${litLink}`, dogListTable(littermates));
     }
 
     // ── Full Siblings ─────────────────────────────────────────────────

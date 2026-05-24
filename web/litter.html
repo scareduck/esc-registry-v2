@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Litter — ESCR Registry Explorer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  background: #f1f3f4;
+  color: #202124;
+  min-height: 100vh;
+}
+
+header {
+  background: #1a73e8;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header a { color: #fff; text-decoration: none; font-size: 13px; opacity: 0.85; }
+header a:hover { opacity: 1; text-decoration: underline; }
+header h1 { font-size: 18px; font-weight: 600; }
+
+main { max-width: 960px; margin: 0 auto; padding: 32px 20px 60px; }
+
+/* ── Cards ──────────────────────────────────────────────────────────── */
+
+.card {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.card-head {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  color: #5f6368; padding: 12px 20px; border-bottom: 1px solid #f1f3f4; background: #f8f9fa;
+}
+.card-body { padding: 0 20px 16px; }
+
+/* ── Mast ───────────────────────────────────────────────────────────── */
+
+.mast-title { font-size: 26px; font-weight: 700; padding: 20px 20px 4px; }
+.mast-sub   { font-size: 13px; color: #5f6368; padding: 0 20px 16px; }
+
+/* ── Key-value grid ─────────────────────────────────────────────────── */
+
+.kv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  font-size: 13px;
+}
+.kv-pair {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f3f4;
+  align-items: baseline;
+}
+.kv-pair:nth-last-child(-n+2) { border-bottom: none; }
+.kv-label { color: #5f6368; white-space: nowrap; }
+.kv-value a { color: #1a73e8; text-decoration: none; }
+.kv-value a:hover { text-decoration: underline; }
+
+/* Full-width kv pair spanning both columns */
+.kv-full {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f3f4;
+  font-size: 13px;
+  align-items: baseline;
+}
+.kv-full:last-child { border-bottom: none; }
+
+/* ── Counts table ───────────────────────────────────────────────────── */
+
+.counts-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.counts-table th {
+  text-align: left; padding: 8px 16px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #5f6368; background: #f8f9fa; border-bottom: 1px solid #dadce0;
+}
+.counts-table td { padding: 8px 16px; border-bottom: 1px solid #f1f3f4; }
+.counts-table tr:last-child td { border-bottom: none; }
+
+/* ── Pup cards ──────────────────────────────────────────────────────── */
+
+.pup-card {
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  font-size: 13px;
+}
+.pup-card:last-child { margin-bottom: 0; }
+
+.pup-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dadce0;
+  flex-wrap: wrap;
+}
+.pup-code { font-weight: 700; font-size: 13px; color: #3c4043; white-space: nowrap; }
+.pup-sex  { font-size: 12px; color: #5f6368; }
+.pup-name { font-size: 14px; font-weight: 600; color: #1a73e8; text-decoration: none; flex: 1; }
+.pup-name:hover { text-decoration: underline; }
+.pup-reg  { font-size: 12px; color: #5f6368; white-space: nowrap; }
+
+.pup-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+  padding: 10px 14px;
+}
+.pup-kv { display: contents; }
+.pup-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 4px 8px;
+  padding: 3px 0;
+  align-items: baseline;
+  font-size: 13px;
+}
+.pup-label { color: #5f6368; }
+.pup-value a { color: #1a73e8; text-decoration: none; }
+.pup-value a:hover { text-decoration: underline; }
+
+/* ── Questionnaire ──────────────────────────────────────────────────── */
+
+.q-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 32px;
+  font-size: 13px;
+  padding: 4px 0;
+}
+.q-row { display: flex; gap: 8px; align-items: baseline; }
+.q-label { color: #5f6368; flex: 1; }
+.q-value { font-weight: 500; white-space: nowrap; }
+.q-full  { grid-column: 1 / -1; }
+
+.note-text {
+  font-size: 13px; color: #3c4043;
+  line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+  margin-top: 4px; padding-top: 4px;
+  border-top: 1px solid #f1f3f4;
+}
+
+.registrar-banner { background: #fff8e1; border-left: 4px solid #fbc02d; }
+
+.error-box { text-align: center; padding: 60px 20px; color: #5f6368; font-size: 15px; }
+.loading   { text-align: center; padding: 60px 20px; color: #80868b; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html">← Search</a>
+  <h1 id="page-title">Litter</h1>
+</header>
+
+<main id="main">
+  <div class="loading">Loading…</div>
+</main>
+
+<script>
+"use strict";
+
+const params   = new URLSearchParams(location.search);
+const litterId = parseInt(params.get('id') || '0', 10);
+
+if (!litterId) {
+    document.getElementById('main').innerHTML = '<div class="error-box">No litter ID specified.</div>';
+} else {
+    fetch('api.php?type=litter&id=' + litterId)
+        .then(r => r.json())
+        .then(render)
+        .catch(() => {
+            document.getElementById('main').innerHTML =
+                '<div class="error-box">Failed to load — check server connection.</div>';
+        });
+}
+
+function render(data) {
+    if (data.error) {
+        document.getElementById('main').innerHTML = `<div class="error-box">${esc(data.error)}</div>`;
+        return;
+    }
+
+    const { litter, breedings, pups } = data;
+    const b = breedings[0] || {};   // primary breeding (first/only for most litters)
+    const dual = breedings.length > 1;
+
+    const litterCode = 'ESC-L' + litter.litterNumber;
+    document.title = litterCode + ' — ESCR Registry Explorer';
+    document.getElementById('page-title').textContent = litterCode;
+
+    let html = '';
+
+    // ── Mast ──────────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="mast-title">${esc(litterCode)}</div>`;
+    if (litter.dateOfWhelp) {
+        html += `<div class="mast-sub">Whelped ${fmtDate(litter.dateOfWhelp)}</div>`;
+    }
+    html += `<div class="card-body"><div class="kv-grid">`;
+
+    // Left column
+    html += kv('Breeder',   litter.breederId
+        ? `<a href="person.html?id=${litter.breederId}">${esc(litter.breederName||'(unnamed)')}</a>` : '—');
+    html += kv('Dam',       litter.damId
+        ? `<a href="dog.html?id=${litter.damId}">${esc(litter.damName||'(unnamed)')}${litter.damReg ? ' · ESC-'+litter.damReg : ''}</a>` : '—');
+    html += kv('Owner of Dam', litter.ownerOfDamId
+        ? `<a href="person.html?id=${litter.ownerOfDamId}">${esc(litter.ownerOfDamName||'(unnamed)')}</a>` : '—');
+    html += kv('Date of Birth', fmtDate(litter.dateOfWhelp) || '—');
+    if (litter.whelpCity || litter.whelpState) {
+        html += kv('Whelping location', esc([litter.whelpCity, litter.whelpState].filter(Boolean).join(', ')));
+    }
+
+    // Right column — sire info from primary breeding
+    if (dual) {
+        html += kv('Sire(s)', breedings.map(br =>
+            br.sireId ? `<a href="dog.html?id=${br.sireId}">${esc(br.sireName||'(unnamed)')}${br.sireReg ? ' · ESC-'+br.sireReg : ''}</a>` : '—'
+        ).join('<br>'));
+    } else {
+        html += kv('Sire', b.sireId
+            ? `<a href="dog.html?id=${b.sireId}">${esc(b.sireName||'(unnamed)')}${b.sireReg ? ' · ESC-'+b.sireReg : ''}</a>` : '—');
+    }
+    html += kv('Owner of Sire', litter.ownerOfSireId
+        ? `<a href="person.html?id=${litter.ownerOfSireId}">${esc(litter.ownerOfSireName||'(unnamed)')}</a>` : '—');
+    html += kv('Date of Breeding', fmtDate(b.dateOfBreeding) || '—');
+    html += kv('Breeding method', esc(b.breedingMethod || '—'));
+    if (b.breedingCity || b.breedingState) {
+        html += kv('Breeding location', esc([b.breedingCity, b.breedingState].filter(Boolean).join(', ')));
+    }
+
+    // Witness row — full width if both present
+    const damWit  = fmtWitness(b.damOwnerWitnessedBreeding);
+    const sireWit = fmtWitness(b.sireOwnerWitnessedBreeding);
+    if (damWit || sireWit) {
+        html += `<div class="kv-full">
+            <span class="kv-label">Witnessed by</span>
+            <span class="kv-value">${[damWit && 'Dam owner', sireWit && 'Sire owner'].filter(Boolean).join(', ')}</span>
+        </div>`;
+    }
+    if (b.descriptionOfPaternity) {
+        html += `<div class="kv-full">
+            <span class="kv-label">Paternity note</span>
+            <span class="kv-value">${esc(b.descriptionOfPaternity)}</span>
+        </div>`;
+    }
+
+    html += `</div></div></div>`;
+
+    // ── Puppy counts ──────────────────────────────────────────────────
+    const ml = litter.numberOfMalesBornLive,    fl = litter.numberOfFemalesBornLive;
+    const ms = litter.numberOfMalesStillborn,   fs = litter.numberOfFemalesStillborn;
+    const mv = litter.numberOfMalesSurviving,   fv = litter.numberOfFemalesSurviving;
+    if (ml != null || fl != null || ms != null || fs != null) {
+        html += `<div class="card">
+            <div class="card-head">Counts</div>
+            <table class="counts-table">
+                <thead><tr><th></th><th>Live</th><th>Stillborn</th><th>Surviving at 6 wks</th></tr></thead>
+                <tbody>
+                    <tr><td>Males</td><td>${ml ?? '—'}</td><td>${ms ?? '—'}</td><td>${mv ?? '—'}</td></tr>
+                    <tr><td>Females</td><td>${fl ?? '—'}</td><td>${fs ?? '—'}</td><td>${fv ?? '—'}</td></tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    // ── Pups ──────────────────────────────────────────────────────────
+    if (pups.length) {
+        let pupHtml = '';
+        for (const p of pups) {
+            const code = litterCode + (p.puppyLetter || '');
+            const reg  = p.registrationNumber ? 'ESC-' + p.registrationNumber : '';
+            const chip = [p.microchipNumber, p.microchipTypeText].filter(Boolean).join(' · ');
+
+            pupHtml += `<div class="pup-card">
+                <div class="pup-header">
+                    <span class="pup-code">${esc(code)}</span>
+                    <span class="pup-sex">${esc(p.sex || '')}</span>
+                    <a class="pup-name" href="dog.html?id=${p.id}">${esc(p.name || '(unnamed)')}</a>
+                    ${reg ? `<span class="pup-reg">${esc(reg)}</span>` : ''}
+                </div>
+                <div class="pup-body">
+                    ${pupRow('Call name',   p.callNames || '—')}
+                    ${pupRow('Color',       p.coatColor || '—')}
+                    ${pupRow('Owner',       p.ownerId
+                        ? `<a href="person.html?id=${p.ownerId}">${esc(p.ownerName||'(unnamed)')}</a>`
+                        : '—')}
+                    ${pupRow('Tail',        p.tailText || '—')}
+                    ${pupRow('Beneficiary', p.beneficiaryId
+                        ? `<a href="person.html?id=${p.beneficiaryId}">${esc(p.beneficiaryName||'(unnamed)')}</a>`
+                        : '—')}
+                    ${pupRow('Rear dewclaws', p.rearDewClawsText || '—')}
+                    ${pupRow('Microchip',   chip || '—')}
+                    ${pupRow('Blue eyes',   p.blueEyesText || '—')}
+                    ${pupRow('Tattoo',      p.tattooNumber || '—')}
+                    ${dual ? pupRow('Sire', p.sireId
+                        ? `<a href="dog.html?id=${p.sireId}">${esc(breedings.find(br=>br.id===p.breedingId)?.sireName||'(unnamed)')}</a>`
+                        : '—') : ''}
+                </div>
+            </div>`;
+        }
+        html += `<div class="card">
+            <div class="card-head">Puppies <span style="font-weight:400;color:#5f6368">(${pups.length})</span></div>
+            <div class="card-body" style="padding-top:12px">${pupHtml}</div>
+        </div>`;
+    }
+
+    // ── Optional Health Questionnaire ─────────────────────────────────
+    const qRows = [];
+    if (litter.naturalWhelpingText)    qRows.push(['Natural whelping',              litter.naturalWhelpingText]);
+    if (litter.plannedCaesarianText)   qRows.push(['Planned caesarian',             litter.plannedCaesarianText]);
+    if (litter.emergencyCaesarianText) qRows.push(['Emergency caesarian',           litter.emergencyCaesarianText]);
+    if (litter.oxytocinText)           qRows.push(['Oxytocin/Pitocin before last whelp', litter.oxytocinText]);
+
+    const deaths = [];
+    if (litter.numberDiedNaturalCauses)  deaths.push([`Died of natural causes (${litter.numberDiedNaturalCauses})`, litter.descriptionDiedNaturalCauses]);
+    if (litter.numberDiedAccidently)     deaths.push([`Died accidentally (${litter.numberDiedAccidently})`,         litter.descriptionOfAccidentalDeaths]);
+    if (litter.numberEuthanized)         deaths.push([`Euthanized (${litter.numberEuthanized})`,                    litter.reasonForEuthanasia]);
+    if (litter.numberSurvivingWithDefects) deaths.push([`Surviving with defects (${litter.numberSurvivingWithDefects})`, litter.descriptionsOfDefects]);
+    if (litter.descriptionOfDefectsInStillborn) deaths.push(['Stillborn defects', litter.descriptionOfDefectsInStillborn]);
+
+    if (qRows.length || deaths.length) {
+        let qHtml = '<div class="q-grid">';
+        for (const [label, val] of qRows) {
+            qHtml += `<div class="q-row"><span class="q-label">${esc(label)}</span><span class="q-value">${esc(val)}</span></div>`;
+        }
+        qHtml += '</div>';
+        for (const [label, note] of deaths) {
+            qHtml += `<div style="margin-top:10px;font-size:13px;font-weight:600">${esc(label)}</div>`;
+            if (note) qHtml += `<div class="note-text">${esc(note)}</div>`;
+        }
+        html += `<div class="card">
+            <div class="card-head">Optional Health Questionnaire</div>
+            <div class="card-body" style="padding-top:12px">${qHtml}</div>
+        </div>`;
+    }
+
+    // ── Registrar comment ─────────────────────────────────────────────
+    if (litter.registrarComment) {
+        html += `<div class="card registrar-banner">
+            <div class="card-head">Registrar Notes <span style="font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">(internal — not public)</span></div>
+            <div class="card-body" style="padding-top:12px;white-space:pre-wrap;font-size:13px">${esc(litter.registrarComment)}</div>
+        </div>`;
+    }
+
+    document.getElementById('main').innerHTML = html;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+
+function kv(label, valueHtml) {
+    return `<div class="kv-pair">
+        <span class="kv-label">${esc(label)}</span>
+        <span class="kv-value">${valueHtml}</span>
+    </div>`;
+}
+
+function pupRow(label, valueHtml) {
+    return `<div class="pup-row">
+        <span class="pup-label">${esc(label)}</span>
+        <span class="pup-value">${valueHtml}</span>
+    </div>`;
+}
+
+function fmtWitness(val) {
+    // damOwnerWitnessedBreeding is a tinyint: 1=true
+    return val == 1;
+}
+
+function fmtDate(s) {
+    if (!s) return null;
+    const d = s.split('T')[0];
+    if (!d || d === '0000-00-00') return null;
+    const [y, m, day] = d.split('-');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[parseInt(m,10)-1]} ${parseInt(day,10)}, ${y}`;
+}
+
+function esc(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>

@@ -663,5 +663,113 @@ if ($type === 'pedigree') {
     exit;
 }
 
+// ── Litter detail ────────────────────────────────────────────────────
+// ?type=litter&id=<id>
+
+if ($type === 'litter') {
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'invalid id']); exit; }
+
+    $stmt = $pdo->prepare("
+        SELECT l.id, l.litterNumber, l.dateOfWhelp,
+               l.city AS whelpCity, sw.text AS whelpState,
+               l.breeder AS breederId,
+               TRIM(CONCAT(COALESCE(br.givenName,''),' ',COALESCE(br.familyName,''))) AS breederName,
+               l.dam AS damId, dam.name AS damName, dam.registrationNumber AS damReg,
+               l.ownerOfDam AS ownerOfDamId,
+               TRIM(CONCAT(COALESCE(od.givenName,''),' ',COALESCE(od.familyName,''))) AS ownerOfDamName,
+               l.ownerOfSire AS ownerOfSireId,
+               TRIM(CONCAT(COALESCE(os.givenName,''),' ',COALESCE(os.familyName,''))) AS ownerOfSireName,
+               l.numberOfMalesBornLive,    l.numberOfFemalesBornLive,
+               l.numberOfMalesStillborn,   l.numberOfFemalesStillborn,
+               l.numberOfMalesSurviving,   l.numberOfFemalesSurviving,
+               yn_nw.text AS naturalWhelpingText,
+               yn_pc.text AS plannedCaesarianText,
+               yn_ec.text AS emergencyCaesarianText,
+               yn_ox.text AS oxytocinText,
+               l.numberDiedNaturalCauses,   l.descriptionDiedNaturalCauses,
+               l.numberDiedAccidently,      l.descriptionOfAccidentalDeaths,
+               l.numberEuthanized,          l.reasonForEuthanasia,
+               l.numberSurvivingWithDefects, l.descriptionsOfDefects,
+               l.descriptionOfDefectsInStillborn,
+               l.registrarComment
+        FROM   Litter l
+        LEFT JOIN State   sw ON sw.code = l.state
+        LEFT JOIN Person  br ON br.id   = l.breeder
+        LEFT JOIN Dog    dam ON dam.id  = l.dam
+        LEFT JOIN Person  od ON od.id   = l.ownerOfDam
+        LEFT JOIN Person  os ON os.id   = l.ownerOfSire
+        LEFT JOIN YesNo yn_nw ON yn_nw.code = l.naturalWhelping
+        LEFT JOIN YesNo yn_pc ON yn_pc.code = l.plannedCaesarian
+        LEFT JOIN YesNo yn_ec ON yn_ec.code = l.emergencyCaesarian
+        LEFT JOIN YesNo yn_ox ON yn_ox.code = l.oxytocinPitocinBeforeLastWhelp
+        WHERE  l.id = :id
+    ");
+    $stmt->execute([':id' => $id]);
+    $litter = $stmt->fetch();
+    if (!$litter) { http_response_code(404); echo json_encode(['error' => 'litter not found']); exit; }
+    foreach (['breederName','ownerOfDamName','ownerOfSireName'] as $f) {
+        $litter[$f] = trim($litter[$f]) ?: null;
+    }
+
+    // Breeding records (normally one; dual-sired litters may have more)
+    $stmt = $pdo->prepare("
+        SELECT b.id, b.sire AS sireId,
+               ds.name AS sireName, ds.registrationNumber AS sireReg,
+               b.dateOfBreeding, b.city AS breedingCity, sb.text AS breedingState,
+               bm.text AS breedingMethod,
+               b.damOwnerWitnessedBreeding, b.sireOwnerWitnessedBreeding,
+               b.descriptionOfMating, b.descriptionOfPaternity
+        FROM   Breeding b
+        LEFT JOIN Dog            ds ON ds.id  = b.sire
+        LEFT JOIN State          sb ON sb.code = b.state
+        LEFT JOIN BreedingMethod bm ON bm.code = b.breedingMethod
+        WHERE  b.litter = :id
+        ORDER  BY b.id
+    ");
+    $stmt->execute([':id' => $id]);
+    $breedings = $stmt->fetchAll();
+
+    // Pups ordered by displayOrder / puppyLetter
+    $stmt = $pdo->prepare("
+        SELECT d.id, d.name, d.registrationNumber, d.puppyLetter, d.displayOrder,
+               sx.text AS sex, cc.text AS coatColor,
+               b.id AS breedingId, b.sire AS sireId,
+               d.owner AS ownerId,
+               TRIM(CONCAT(COALESCE(po.givenName,''),' ',COALESCE(po.familyName,''))) AS ownerName,
+               d.beneficiary AS beneficiaryId,
+               TRIM(CONCAT(COALESCE(pb.givenName,''),' ',COALESCE(pb.familyName,''))) AS beneficiaryName,
+               dd.callNames, dd.microchipNumber,
+               mct.text AS microchipTypeText,
+               dd.tattooNumber,
+               t.text   AS tailText,
+               yn_rd.text AS rearDewClawsText,
+               yn_be.text AS blueEyesText
+        FROM   Dog d
+        JOIN   Breeding b  ON b.id = d.breeding AND b.litter = :id
+        LEFT JOIN Sex        sx    ON sx.code   = d.sex
+        LEFT JOIN CoatColor  cc    ON cc.code   = d.coatColor
+        LEFT JOIN Person     po    ON po.id     = d.owner
+        LEFT JOIN Person     pb    ON pb.id     = d.beneficiary
+        LEFT JOIN DogDetail  dd    ON dd.id     = d.details
+        LEFT JOIN MicrochipType mct ON mct.code = dd.microchipType
+        LEFT JOIN Tail        t    ON t.code    = dd.tail
+        LEFT JOIN YesNo yn_rd ON yn_rd.code = dd.rearDewClaws
+        LEFT JOIN YesNo yn_be ON yn_be.code = dd.blueEyes
+        ORDER  BY d.displayOrder, d.puppyLetter
+    ");
+    $stmt->execute([':id' => $id]);
+    $pups = $stmt->fetchAll();
+    foreach ($pups as &$p) {
+        $p['ownerName']       = trim($p['ownerName'])       ?: null;
+        $p['beneficiaryName'] = trim($p['beneficiaryName']) ?: null;
+    }
+    unset($p);
+
+    echo json_encode(['litter' => $litter, 'breedings' => $breedings, 'pups' => $pups],
+                     JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 http_response_code(400);
 echo json_encode(['error' => 'unknown type']);

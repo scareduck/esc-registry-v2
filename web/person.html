@@ -368,12 +368,16 @@ function renderLitterGroups(groups, sortMode) {
             : 'Dam: unknown';
         const dateStr = g.dateOfWhelp ? fmtDate(g.dateOfWhelp) : '';
         const numStr  = `${g.pups.length} pup${g.pups.length !== 1 ? 's' : ''}`;
+        const litLink = g.litterId
+            ? `<a href="litter.html?id=${g.litterId}" class="litter-meta">ESC-L${g.litterNumber}</a>`
+            : '';
 
         body += `<div class="litter-group">
             <div class="litter-head">
                 <span>${damStr}</span>
                 ${sireStr ? `<span>${sireStr}</span>` : ''}
                 <span class="litter-meta">${[dateStr, numStr].filter(Boolean).join(' · ')}</span>
+                ${litLink}
             </div>`;
 
         body += `<table class="dog-table"><thead><tr>
