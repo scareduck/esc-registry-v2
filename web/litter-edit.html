@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edit Litter — ESCR Registry Explorer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  background: #f1f3f4;
+  color: #202124;
+  min-height: 100vh;
+}
+
+header {
+  background: #1a73e8;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header a { color: #fff; text-decoration: none; font-size: 13px; opacity: 0.85; }
+header a:hover { opacity: 1; text-decoration: underline; }
+header h1 { font-size: 18px; font-weight: 600; }
+
+main { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
+
+.card {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: visible;
+}
+.card-head {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  color: #5f6368; padding: 12px 20px; border-bottom: 1px solid #f1f3f4; background: #f8f9fa;
+  border-radius: 10px 10px 0 0;
+}
+.card-body { padding: 16px 20px; }
+.registrar-banner { background: #fff8e1; border-left: 4px solid #fbc02d; }
+
+/* ── Form ────────────────────────────────────────────────────────────── */
+.form-label {
+  display: block; font-size: 11px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: #5f6368; margin-bottom: 4px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%; padding: 7px 10px; font-size: 13px; font-family: inherit;
+  border: 1px solid #dadce0; border-radius: 6px; background: #fff; color: #202124;
+  transition: border-color .15s;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none; border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,.15);
+}
+.form-input[readonly] { background: #f8f9fa; color: #5f6368; cursor: default; }
+.form-textarea { resize: vertical; min-height: 60px; }
+.form-select { cursor: pointer; }
+.form-group { min-width: 0; }
+.form-row { display: flex; gap: 12px; margin-bottom: 10px; }
+.form-row:last-child { margin-bottom: 0; }
+.check-label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; padding: 7px 0; }
+.check-label input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+
+/* ── Typeahead ───────────────────────────────────────────────────────── */
+.ta-wrap { position: relative; }
+.ta-row  { display: flex; gap: 4px; }
+.ta-input { flex: 1; min-width: 0; }
+.ta-clear {
+  flex: 0 0 auto; padding: 7px 9px; background: #f1f3f4; border: 1px solid #dadce0;
+  border-radius: 6px; cursor: pointer; font-size: 13px; color: #5f6368; line-height: 1;
+}
+.ta-clear:hover { background: #e8eaed; color: #202124; }
+.ta-drop {
+  position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 50;
+  background: #fff; border: 1px solid #dadce0; border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.13); max-height: 220px; overflow-y: auto;
+}
+.ta-item { padding: 8px 12px; cursor: pointer; font-size: 13px; display: flex; gap: 6px; align-items: baseline; }
+.ta-item:hover, .ta-item.ta-active { background: #e8f0fe; }
+.ta-item-label { font-weight: 500; }
+.ta-item-sub   { font-size: 12px; color: #5f6368; }
+
+/* ── Pup cards ───────────────────────────────────────────────────────── */
+.pup-card { border: 1px solid #dadce0; border-radius: 8px; margin-bottom: 12px; overflow: visible; }
+.pup-card:last-child { margin-bottom: 0; }
+.pup-header {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: #f8f9fa; border-bottom: 1px solid #dadce0; border-radius: 8px 8px 0 0;
+}
+.pup-badge { font-weight: 700; font-size: 13px; background: #e8f0fe; color: #1a73e8; padding: 2px 10px; border-radius: 12px; }
+.pup-reg-badge { font-size: 12px; color: #5f6368; }
+.pup-fields { padding: 12px 14px; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────── */
+.btn-primary {
+  background: #1a73e8; color: #fff; border: none; border-radius: 6px;
+  padding: 8px 18px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
+}
+.btn-primary:hover:not(:disabled) { background: #1557b0; }
+.btn-primary:disabled { background: #a8c7fa; cursor: not-allowed; }
+
+.btn-ghost {
+  background: none; border: 1px solid #dadce0; border-radius: 6px; color: #202124;
+  padding: 8px 16px; font-size: 13px; cursor: pointer; text-decoration: none;
+  display: inline-block; font-family: inherit;
+}
+.btn-ghost:hover { background: #f1f3f4; }
+
+.btn-ghost-sm {
+  background: none; border: none; color: #5f6368; font-size: 12px;
+  cursor: pointer; padding: 2px 8px; border-radius: 4px; font-family: inherit;
+}
+.btn-ghost-sm:hover { background: #f1f3f4; }
+
+.action-bar {
+  display: flex; align-items: center; justify-content: space-between; padding: 8px 0;
+}
+.save-status { font-size: 13px; font-weight: 500; }
+.section-rule {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: #80868b; margin: 14px 0 8px;
+}
+.loading   { text-align: center; padding: 60px 20px; color: #80868b; }
+.error-box { text-align: center; padding: 60px 20px; color: #5f6368; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html">← Search</a>
+  <h1 id="page-title">Edit Litter</h1>
+</header>
+
+<main id="main">
+  <div class="loading">Loading…</div>
+</main>
+
+<script>
+"use strict";
+
+/* ── Globals ─────────────────────────────────────────────────────────── */
+const params    = new URLSearchParams(location.search);
+const litterId  = parseInt(params.get('id') || '0', 10);
+const _ta       = {};
+let _lookups    = {};
+let _litter     = null;
+let _breedings  = [];
+let _pups       = [];
+let _nextIdx    = 0;
+
+/* ── Typeahead ───────────────────────────────────────────────────────── */
+class Typeahead {
+    constructor(el, searchFn) {
+        this._el = el; this._searchFn = searchFn;
+        this._id = null; this._items = []; this._active = -1;
+        this._build();
+    }
+    _build() {
+        this._el.innerHTML =
+            `<div class="ta-row">
+                <input class="form-input ta-input" autocomplete="off" spellcheck="false" placeholder="Type to search…">
+                <button class="ta-clear" type="button" hidden>✕</button>
+            </div>
+            <div class="ta-drop" hidden></div>`;
+        this._inp  = this._el.querySelector('.ta-input');
+        this._drop = this._el.querySelector('.ta-drop');
+        this._clr  = this._el.querySelector('.ta-clear');
+        let timer;
+        this._inp.addEventListener('input', () => {
+            this._id = null;
+            this._clr.hidden = !this._inp.value;
+            clearTimeout(timer);
+            const q = this._inp.value.trim();
+            if (q.length < 2) { this._drop.hidden = true; return; }
+            timer = setTimeout(() => this._search(q), 200);
+        });
+        this._clr.addEventListener('click', () => {
+            this._id = null; this._inp.value = ''; this._drop.hidden = true;
+            this._clr.hidden = true; this._inp.focus();
+        });
+        this._inp.addEventListener('keydown', e => {
+            if (this._drop.hidden) return;
+            const n = this._items.length;
+            if (e.key === 'ArrowDown') { this._active = Math.min(this._active + 1, n - 1); this._hi(); e.preventDefault(); }
+            if (e.key === 'ArrowUp')   { this._active = Math.max(this._active - 1, 0);     this._hi(); e.preventDefault(); }
+            if (e.key === 'Enter' && this._active >= 0) { this._pick(this._active); e.preventDefault(); }
+            if (e.key === 'Escape') this._drop.hidden = true;
+        });
+        document.addEventListener('click', e => { if (!this._el.contains(e.target)) this._drop.hidden = true; });
+    }
+    async _search(q) {
+        this._items = await this._searchFn(q);
+        this._active = -1;
+        if (!this._items.length) { this._drop.hidden = true; return; }
+        this._drop.innerHTML = this._items.map((it, i) =>
+            `<div class="ta-item" data-i="${i}">
+                <span class="ta-item-label">${esc(it.label)}</span>
+                ${it.sub ? `<span class="ta-item-sub">${esc(it.sub)}</span>` : ''}
+            </div>`
+        ).join('');
+        this._drop.hidden = false;
+        this._drop.querySelectorAll('.ta-item').forEach(el =>
+            el.addEventListener('mousedown', e => { e.preventDefault(); this._pick(+el.dataset.i); }));
+    }
+    _pick(i) {
+        const it = this._items[i];
+        this._id = it.id; this._inp.value = it.label;
+        this._clr.hidden = false; this._drop.hidden = true;
+    }
+    _hi() {
+        this._drop.querySelectorAll('.ta-item').forEach((el, i) =>
+            el.classList.toggle('ta-active', i === this._active));
+    }
+    set(id, name) { this._id = id || null; this._inp.value = name || ''; this._clr.hidden = !name; }
+    get id()   { return this._id; }
+}
+
+async function personSearch(q) {
+    try {
+        const r = await fetch(`api.php?type=search&q=${encodeURIComponent(q)}&limit=8`).then(r => r.json());
+        return (r.people || []).map(p => ({
+            id: p.id,
+            label: [p.givenName, p.familyName].filter(Boolean).join(' '),
+            sub: p.kennel || '',
+        }));
+    } catch { return []; }
+}
+
+async function dogSearch(q) {
+    try {
+        const r = await fetch(`api.php?type=search&q=${encodeURIComponent(q)}&limit=8`).then(r => r.json());
+        return (r.dogs || []).map(d => ({
+            id: d.id,
+            label: d.name || '(unnamed)',
+            sub: d.registrationNumber ? 'ESC-' + d.registrationNumber : '',
+        }));
+    } catch { return []; }
+}
+
+/* ── Boot ────────────────────────────────────────────────────────────── */
+if (!litterId) {
+    document.getElementById('main').innerHTML = '<div class="error-box">No litter ID specified.</div>';
+} else {
+    Promise.all([
+        fetch('api.php?type=litter&id=' + litterId).then(r => r.json()),
+        fetch('api.php?type=lookups').then(r => r.json()),
+    ]).then(([data, lookups]) => {
+        if (data.error) {
+            document.getElementById('main').innerHTML = `<div class="error-box">${esc(data.error)}</div>`;
+            return;
+        }
+        _lookups   = lookups;
+        _litter    = data.litter;
+        _breedings = data.breedings;
+        _pups      = data.pups.map((p, i) => ({...p, _new: false, _idx: i}));
+        _nextIdx   = _pups.length;
+        render();
+    }).catch(() => {
+        document.getElementById('main').innerHTML = '<div class="error-box">Failed to load — check server connection.</div>';
+    });
+}
+
+/* ── Render ──────────────────────────────────────────────────────────── */
+function render() {
+    const l = _litter;
+    const b = _breedings[0] || {};
+    const litterCode = 'ESC-L' + l.litterNumber;
+
+    document.title = 'Edit ' + litterCode + ' — ESCR Registry Explorer';
+    document.getElementById('page-title').textContent = 'Edit ' + litterCode;
+
+    let html = '';
+
+    // Litter card
+    html += `<div class="card">
+        <div class="card-head">Litter</div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:0 0 150px">
+                    <label class="form-label">Litter Number</label>
+                    <input class="form-input" value="${esc(litterCode)}" readonly>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Dam</label>
+                    <div class="ta-wrap" id="ta-dam"></div>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Owner of Dam</label>
+                    <div class="ta-wrap" id="ta-ownerOfDam"></div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Breeder</label>
+                    <div class="ta-wrap" id="ta-breeder"></div>
+                </div>
+                <div class="form-group" style="flex:1"></div>
+            </div>
+        </div>
+    </div>`;
+
+    // Breeding card
+    html += `<div class="card">
+        <div class="card-head">Breeding</div>
+        <div class="card-body">
+            <input type="hidden" id="breeding-id" value="${esc(b.id || '')}">
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Sire</label>
+                    <div class="ta-wrap" id="ta-sire"></div>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Owner of Sire</label>
+                    <div class="ta-wrap" id="ta-ownerOfSire"></div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Date of Breeding</label>
+                    <input class="form-input" type="date" id="date-of-breeding" value="${esc(isoDate(b.dateOfBreeding) || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Breeding Method</label>
+                    <select class="form-select" id="breeding-method">${opts(_lookups.breedingMethods, b.breedingMethodCode)}</select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Breeding City</label>
+                    <input class="form-input" id="breeding-city" value="${esc(b.breedingCity || '')}">
+                </div>
+                <div class="form-group" style="flex:3">
+                    <label class="form-label">Breeding State</label>
+                    <select class="form-select" id="breeding-state">${opts(_lookups.states, b.breedingStateCode)}</select>
+                </div>
+            </div>
+            <div class="form-row" style="gap:32px">
+                <div class="form-group">
+                    <label class="form-label">Dam owner witnessed</label>
+                    <label class="check-label"><input type="checkbox" id="dam-witnessed" ${b.damOwnerWitnessedBreeding == 1 ? 'checked' : ''}> Yes</label>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Sire owner witnessed</label>
+                    <label class="check-label"><input type="checkbox" id="sire-witnessed" ${b.sireOwnerWitnessedBreeding == 1 ? 'checked' : ''}> Yes</label>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Description of mating</label>
+                    <textarea class="form-textarea" id="mating-desc" rows="2">${esc(b.descriptionOfMating || '')}</textarea>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Paternity note</label>
+                    <textarea class="form-textarea" id="paternity-note" rows="2">${esc(b.descriptionOfPaternity || '')}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // Whelping card
+    html += `<div class="card">
+        <div class="card-head">Whelping</div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Date of Birth</label>
+                    <input class="form-input" type="date" id="date-of-whelp" value="${esc(isoDate(l.dateOfWhelp) || '')}">
+                </div>
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Whelping City</label>
+                    <input class="form-input" id="whelp-city" value="${esc(l.whelpCity || '')}">
+                </div>
+                <div class="form-group" style="flex:3">
+                    <label class="form-label">Whelping State</label>
+                    <select class="form-select" id="whelp-state">${opts(_lookups.states, l.whelpStateCode)}</select>
+                </div>
+            </div>
+            <div class="form-row">
+                ${cg('Males born live',       'nml', l.numberOfMalesBornLive)}
+                ${cg('Males stillborn',       'nms', l.numberOfMalesStillborn)}
+                ${cg('Males surviving 6 wk',  'nmv', l.numberOfMalesSurviving)}
+                ${cg('Females born live',      'nfl', l.numberOfFemalesBornLive)}
+                ${cg('Females stillborn',      'nfs', l.numberOfFemalesStillborn)}
+                ${cg('Females surviving 6 wk', 'nfv', l.numberOfFemalesSurviving)}
+            </div>
+        </div>
+    </div>`;
+
+    // Pups card
+    html += `<div class="card">
+        <div class="card-head" style="display:flex;align-items:center;justify-content:space-between">
+            <span>Puppies <span style="font-weight:400;color:#5f6368" id="pup-count">(${_pups.length})</span></span>
+            <button class="btn-primary" type="button" id="add-pup">+ Add Pup</button>
+        </div>
+        <div class="card-body" style="padding-top:12px" id="pup-list">
+            ${_pups.map((p, i) => pupCardHtml(p, i)).join('')}
+        </div>
+    </div>`;
+
+    // Health questionnaire
+    html += `<div class="card">
+        <div class="card-head">Optional Health Questionnaire</div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Natural whelping</label>
+                    <select class="form-select" id="q-natural">${opts(_lookups.yesNo, l.naturalWhelpingCode)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Planned Caesarian</label>
+                    <select class="form-select" id="q-planned-c">${opts(_lookups.yesNo, l.plannedCaesarianCode)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Emergency Caesarian</label>
+                    <select class="form-select" id="q-emerg-c">${opts(_lookups.yesNo, l.emergencyCaesarianCode)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Oxytocin/Pitocin</label>
+                    <select class="form-select" id="q-oxytocin">${opts(_lookups.yesNo, l.oxytocinCode)}</select>
+                </div>
+            </div>
+            <div class="section-rule">Perinatal Mortality &amp; Morbidity</div>
+            <div class="form-row">
+                ${cg('Died naturally',       'ndnc', l.numberDiedNaturalCauses)}
+                ${cg('Died accidentally',    'nda',  l.numberDiedAccidently)}
+                ${cg('Euthanized',           'ne',   l.numberEuthanized)}
+                ${cg('Surviving w/ defects', 'nsd',  l.numberSurvivingWithDefects)}
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Cause of natural deaths</label>
+                    <textarea class="form-textarea" id="ddnc" rows="2">${esc(l.descriptionDiedNaturalCauses || '')}</textarea>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Mechanism of accidental deaths</label>
+                    <textarea class="form-textarea" id="doa" rows="2">${esc(l.descriptionOfAccidentalDeaths || '')}</textarea>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Reason for euthanasia</label>
+                    <textarea class="form-textarea" id="re" rows="2">${esc(l.reasonForEuthanasia || '')}</textarea>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Description of defects (surviving)</label>
+                    <textarea class="form-textarea" id="dod" rows="2">${esc(l.descriptionsOfDefects || '')}</textarea>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Defects in stillborn</label>
+                <textarea class="form-textarea" id="dois" rows="2">${esc(l.descriptionOfDefectsInStillborn || '')}</textarea>
+            </div>
+        </div>
+    </div>`;
+
+    // Registrar notes
+    html += `<div class="card registrar-banner">
+        <div class="card-head">Registrar Notes <span style="font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">(internal)</span></div>
+        <div class="card-body">
+            <textarea class="form-textarea" id="registrar-comment" rows="5">${esc(l.registrarComment || '')}</textarea>
+        </div>
+    </div>`;
+
+    // Action bar
+    html += `<div class="action-bar">
+        <a class="btn-ghost" href="litter.html?id=${litterId}">Cancel</a>
+        <div style="display:flex;gap:12px;align-items:center">
+            <span class="save-status" id="save-status"></span>
+            <button class="btn-primary" type="button" id="save-btn">Save changes</button>
+        </div>
+    </div>`;
+
+    document.getElementById('main').innerHTML = html;
+
+    // Init litter-level typeaheads
+    initTA('dam',        dogSearch,    _litter.damId,        dogLabel(_litter.damName, _litter.damReg));
+    initTA('ownerOfDam', personSearch, _litter.ownerOfDamId, _litter.ownerOfDamName);
+    initTA('breeder',    personSearch, _litter.breederId,    _litter.breederName);
+    initTA('sire',       dogSearch,    b.sireId,             dogLabel(b.sireName, b.sireReg));
+    initTA('ownerOfSire',personSearch, _litter.ownerOfSireId,_litter.ownerOfSireName);
+
+    // Init pup typeaheads
+    _pups.forEach(p => {
+        initTA(`pup-${p._idx}-owner`,       personSearch, p.ownerId,       p.ownerName);
+        initTA(`pup-${p._idx}-beneficiary`, personSearch, p.beneficiaryId, p.beneficiaryName);
+    });
+
+    document.getElementById('add-pup').addEventListener('click', addPup);
+    document.getElementById('save-btn').addEventListener('click', save);
+    document.querySelectorAll('.pup-remove').forEach(btn => btn.addEventListener('click', removePup));
+}
+
+function dogLabel(name, reg) {
+    if (!name) return null;
+    return name + (reg ? ' · ESC-' + reg : '');
+}
+
+function initTA(key, searchFn, id, name) {
+    const el = document.getElementById('ta-' + key);
+    if (!el) return null;
+    const ta = new Typeahead(el, searchFn);
+    if (id || name) ta.set(id, name);
+    _ta[key] = ta;
+    return ta;
+}
+
+/* ── Pup card HTML ───────────────────────────────────────────────────── */
+function pupCardHtml(p, displayPos) {
+    const letter = String.fromCharCode(65 + displayPos);
+    const reg    = p.registrationNumber ? 'ESC-' + p.registrationNumber : '';
+    const isNew  = !p.id;
+
+    return `<div class="pup-card" data-pup-id="${p.id || 0}" data-pup-idx="${p._idx}" data-breeding-id="${p.breedingId || 0}">
+        <div class="pup-header">
+            <span class="pup-badge">Pup ${esc(letter)}</span>
+            ${reg ? `<span class="pup-reg-badge">${esc(reg)}</span>` : ''}
+            ${isNew ? `<button class="pup-remove btn-ghost-sm" type="button" style="margin-left:auto;color:#d93025">Remove</button>` : ''}
+        </div>
+        <div class="pup-fields">
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Name</label>
+                    <input class="form-input" data-f="name" value="${esc(p.name || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Call name</label>
+                    <input class="form-input" data-f="callNames" value="${esc(p.callNames || '')}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Sex</label>
+                    <select class="form-select" data-f="sexCode">${opts(_lookups.sexes, p.sexCode)}</select>
+                </div>
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Color</label>
+                    <select class="form-select" data-f="coatColorCode">${opts(_lookups.coatColors, p.coatColorCode)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Tail</label>
+                    <select class="form-select" data-f="tailCode">${opts(_lookups.tails, p.tailCode)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Rear Dewclaws</label>
+                    <select class="form-select" data-f="rearDewClawsCode">${opts(_lookups.yesNo, p.rearDewClawsCode)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Blue Eyes</label>
+                    <select class="form-select" data-f="blueEyesCode">${opts(_lookups.yesNo, p.blueEyesCode)}</select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Microchip #</label>
+                    <input class="form-input" data-f="microchipNumber" value="${esc(p.microchipNumber || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Microchip Type</label>
+                    <select class="form-select" data-f="microchipTypeCode">${opts(_lookups.microchipTypes, p.microchipTypeCode)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Tattoo #</label>
+                    <input class="form-input" data-f="tattooNumber" value="${esc(p.tattooNumber || '')}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Owner</label>
+                    <div class="ta-wrap" id="ta-pup-${p._idx}-owner"></div>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Beneficiary</label>
+                    <div class="ta-wrap" id="ta-pup-${p._idx}-beneficiary"></div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+/* ── Add / Remove pup ───────────────────────────────────────────────── */
+function addPup() {
+    const displayPos = _pups.length;
+    const idx        = _nextIdx++;
+    const breedingId = _breedings[0]?.id || 0;
+    const newPup = {
+        id: 0, _new: true, _idx: idx, breedingId,
+        registrationNumber: null, name: '', callNames: '',
+        sexCode: null, coatColorCode: null, tailCode: null,
+        rearDewClawsCode: null, blueEyesCode: null,
+        microchipNumber: '', microchipTypeCode: null, tattooNumber: '',
+        ownerId: null, ownerName: null, beneficiaryId: null, beneficiaryName: null,
+    };
+    _pups.push(newPup);
+
+    const tmp = document.createElement('div');
+    tmp.innerHTML = pupCardHtml(newPup, displayPos);
+    const card = tmp.firstElementChild;
+    document.getElementById('pup-list').appendChild(card);
+
+    initTA(`pup-${idx}-owner`,       personSearch, null, null);
+    initTA(`pup-${idx}-beneficiary`, personSearch, null, null);
+    card.querySelector('.pup-remove')?.addEventListener('click', removePup);
+
+    document.getElementById('pup-count').textContent = `(${_pups.length})`;
+    card.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+
+function removePup(e) {
+    const card = e.target.closest('.pup-card');
+    const idx  = parseInt(card.dataset.pupIdx);
+    _pups = _pups.filter(p => p._idx !== idx);
+    delete _ta[`pup-${idx}-owner`];
+    delete _ta[`pup-${idx}-beneficiary`];
+    card.remove();
+    document.querySelectorAll('#pup-list .pup-card').forEach((c, i) => {
+        c.querySelector('.pup-badge').textContent = 'Pup ' + String.fromCharCode(65 + i);
+    });
+    document.getElementById('pup-count').textContent = `(${_pups.length})`;
+}
+
+/* ── Collect & Save ──────────────────────────────────────────────────── */
+function collectPups() {
+    return Array.from(document.querySelectorAll('#pup-list .pup-card')).map((card, displayOrder) => {
+        const pupId  = parseInt(card.dataset.pupId)      || 0;
+        const pupIdx = parseInt(card.dataset.pupIdx);
+        const brId   = parseInt(card.dataset.breedingId) || (_breedings[0]?.id || 0);
+        const gf = f => (card.querySelector(`[data-f="${f}"]`)?.value ?? '') || null;
+        return {
+            id:               pupId,
+            breedingId:       brId,
+            puppyLetter:      String.fromCharCode(65 + displayOrder),
+            name:             gf('name'),
+            callNames:        gf('callNames'),
+            sexCode:          gf('sexCode'),
+            coatColorCode:    gf('coatColorCode'),
+            tailCode:         gf('tailCode'),
+            rearDewClawsCode: gf('rearDewClawsCode'),
+            blueEyesCode:     gf('blueEyesCode'),
+            microchipNumber:  gf('microchipNumber'),
+            microchipTypeCode:gf('microchipTypeCode'),
+            tattooNumber:     gf('tattooNumber'),
+            ownerId:          _ta[`pup-${pupIdx}-owner`]?.id       || null,
+            beneficiaryId:    _ta[`pup-${pupIdx}-beneficiary`]?.id || null,
+        };
+    });
+}
+
+async function save() {
+    const btn    = document.getElementById('save-btn');
+    const status = document.getElementById('save-status');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    status.textContent = ''; status.style.color = '';
+
+    const payload = {
+        id: litterId,
+        dateOfWhelp:    v('date-of-whelp'),
+        whelpCity:      v('whelp-city'),
+        whelpStateCode: v('whelp-state'),
+        breederId:      _ta['breeder']?.id     || null,
+        damId:          _ta['dam']?.id         || null,
+        ownerOfDamId:   _ta['ownerOfDam']?.id  || null,
+        ownerOfSireId:  _ta['ownerOfSire']?.id || null,
+        numberOfMalesBornLive:    nv('nml'),
+        numberOfFemalesBornLive:  nv('nfl'),
+        numberOfMalesStillborn:   nv('nms'),
+        numberOfFemalesStillborn: nv('nfs'),
+        numberOfMalesSurviving:   nv('nmv'),
+        numberOfFemalesSurviving: nv('nfv'),
+        naturalWhelpingCode:    v('q-natural'),
+        plannedCaesarianCode:   v('q-planned-c'),
+        emergencyCaesarianCode: v('q-emerg-c'),
+        oxytocinCode:           v('q-oxytocin'),
+        numberDiedNaturalCauses:      nv('ndnc'),
+        descriptionDiedNaturalCauses: v('ddnc'),
+        numberDiedAccidently:         nv('nda'),
+        descriptionOfAccidentalDeaths:v('doa'),
+        numberEuthanized:             nv('ne'),
+        reasonForEuthanasia:          v('re'),
+        numberSurvivingWithDefects:   nv('nsd'),
+        descriptionsOfDefects:        v('dod'),
+        descriptionOfDefectsInStillborn: v('dois'),
+        registrarComment: v('registrar-comment'),
+        breedings: [{
+            id:                         parseInt(document.getElementById('breeding-id')?.value) || 0,
+            sireId:                     _ta['sire']?.id || null,
+            dateOfBreeding:             v('date-of-breeding'),
+            breedingCity:               v('breeding-city'),
+            breedingStateCode:          v('breeding-state'),
+            breedingMethodCode:         v('breeding-method'),
+            damOwnerWitnessedBreeding:  document.getElementById('dam-witnessed').checked  ? 1 : 0,
+            sireOwnerWitnessedBreeding: document.getElementById('sire-witnessed').checked ? 1 : 0,
+            descriptionOfMating:        v('mating-desc'),
+            descriptionOfPaternity:     v('paternity-note'),
+        }],
+        pups: collectPups(),
+    };
+
+    try {
+        const r = await fetch('api.php?type=litter-save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        }).then(r => r.json());
+
+        if (r.ok) {
+            status.textContent = '✓ Saved';
+            status.style.color = '#137333';
+            setTimeout(() => { status.textContent = ''; }, 4000);
+        } else {
+            status.textContent = 'Error: ' + (r.error || 'save failed');
+            status.style.color = '#d93025';
+        }
+    } catch {
+        status.textContent = 'Network error — not saved';
+        status.style.color = '#d93025';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Save changes';
+}
+
+/* ── Helpers ─────────────────────────────────────────────────────────── */
+function v(id)  { const el = document.getElementById(id); return el ? (el.value || null) : null; }
+function nv(id) { const el = document.getElementById(id); if (!el || el.value === '') return null; const n = parseInt(el.value, 10); return isNaN(n) ? null : n; }
+
+function opts(items, current) {
+    if (!items) return '';
+    let html = '<option value="">—</option>';
+    for (const it of items) {
+        const sel = String(it.code) === String(current) ? ' selected' : '';
+        html += `<option value="${esc(String(it.code))}"${sel}>${esc(it.text)}</option>`;
+    }
+    return html;
+}
+
+function cg(label, id, val) {
+    return `<div class="form-group" style="flex:1">
+        <label class="form-label">${esc(label)}</label>
+        <input class="form-input" type="number" min="0" id="${esc(id)}" value="${val != null ? val : ''}">
+    </div>`;
+}
+
+function isoDate(s) {
+    if (!s) return null;
+    const d = s.split('T')[0];
+    return (d && d !== '0000-00-00') ? d : null;
+}
+
+function esc(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>

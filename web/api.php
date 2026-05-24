@@ -672,7 +672,7 @@ if ($type === 'litter') {
 
     $stmt = $pdo->prepare("
         SELECT l.id, l.litterNumber, l.dateOfWhelp,
-               l.city AS whelpCity, sw.text AS whelpState,
+               l.city AS whelpCity, sw.text AS whelpState, l.state AS whelpStateCode,
                l.breeder AS breederId,
                TRIM(CONCAT(COALESCE(br.givenName,''),' ',COALESCE(br.familyName,''))) AS breederName,
                l.dam AS damId, dam.name AS damName, dam.registrationNumber AS damReg,
@@ -683,10 +683,10 @@ if ($type === 'litter') {
                l.numberOfMalesBornLive,    l.numberOfFemalesBornLive,
                l.numberOfMalesStillborn,   l.numberOfFemalesStillborn,
                l.numberOfMalesSurviving,   l.numberOfFemalesSurviving,
-               yn_nw.text AS naturalWhelpingText,
-               yn_pc.text AS plannedCaesarianText,
-               yn_ec.text AS emergencyCaesarianText,
-               yn_ox.text AS oxytocinText,
+               yn_nw.text AS naturalWhelpingText,   l.naturalWhelping AS naturalWhelpingCode,
+               yn_pc.text AS plannedCaesarianText,  l.plannedCaesarian AS plannedCaesarianCode,
+               yn_ec.text AS emergencyCaesarianText, l.emergencyCaesarian AS emergencyCaesarianCode,
+               yn_ox.text AS oxytocinText,           l.oxytocinPitocinBeforeLastWhelp AS oxytocinCode,
                l.numberDiedNaturalCauses,   l.descriptionDiedNaturalCauses,
                l.numberDiedAccidently,      l.descriptionOfAccidentalDeaths,
                l.numberEuthanized,          l.reasonForEuthanasia,
@@ -719,7 +719,8 @@ if ($type === 'litter') {
                b.dateOfBreeding, b.city AS breedingCity, sb.text AS breedingState,
                bm.text AS breedingMethod,
                b.damOwnerWitnessedBreeding, b.sireOwnerWitnessedBreeding,
-               b.descriptionOfMating, b.descriptionOfPaternity
+               b.descriptionOfMating, b.descriptionOfPaternity,
+               b.state AS breedingStateCode, b.breedingMethod AS breedingMethodCode
         FROM   Breeding b
         LEFT JOIN Dog            ds ON ds.id  = b.sire
         LEFT JOIN State          sb ON sb.code = b.state
@@ -733,18 +734,19 @@ if ($type === 'litter') {
     // Pups ordered by displayOrder / puppyLetter
     $stmt = $pdo->prepare("
         SELECT d.id, d.name, d.registrationNumber, d.puppyLetter, d.displayOrder,
-               sx.text AS sex, cc.text AS coatColor,
+               sx.text AS sex,    d.sex AS sexCode,
+               cc.text AS coatColor, d.coatColor AS coatColorCode,
                b.id AS breedingId, b.sire AS sireId,
                d.owner AS ownerId,
                TRIM(CONCAT(COALESCE(po.givenName,''),' ',COALESCE(po.familyName,''))) AS ownerName,
                d.beneficiary AS beneficiaryId,
                TRIM(CONCAT(COALESCE(pb.givenName,''),' ',COALESCE(pb.familyName,''))) AS beneficiaryName,
                dd.callNames, dd.microchipNumber,
-               mct.text AS microchipTypeText,
+               mct.text AS microchipTypeText, dd.microchipType AS microchipTypeCode,
                dd.tattooNumber,
-               t.text   AS tailText,
-               yn_rd.text AS rearDewClawsText,
-               yn_be.text AS blueEyesText
+               t.text   AS tailText,   dd.tail AS tailCode,
+               yn_rd.text AS rearDewClawsText, dd.rearDewClaws AS rearDewClawsCode,
+               yn_be.text AS blueEyesText,     dd.blueEyes AS blueEyesCode
         FROM   Dog d
         JOIN   Breeding b  ON b.id = d.breeding AND b.litter = :id
         LEFT JOIN Sex        sx    ON sx.code   = d.sex
@@ -768,6 +770,256 @@ if ($type === 'litter') {
 
     echo json_encode(['litter' => $litter, 'breedings' => $breedings, 'pups' => $pups],
                      JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ── Lookup tables ────────────────────────────────────────────────────
+// ?type=lookups
+// Returns small lookup tables for editor selects.
+
+if ($type === 'lookups') {
+    function fetchLookup($pdo, $table, $order = 'menuOrder') {
+        $stmt = $pdo->query("SELECT code, text FROM `{$table}` ORDER BY {$order}");
+        return $stmt->fetchAll();
+    }
+    echo json_encode([
+        'sexes'          => fetchLookup($pdo, 'Sex'),
+        'coatColors'     => fetchLookup($pdo, 'CoatColor'),
+        'tails'          => fetchLookup($pdo, 'Tail'),
+        'microchipTypes' => fetchLookup($pdo, 'MicrochipType'),
+        'breedingMethods'=> fetchLookup($pdo, 'BreedingMethod'),
+        'yesNo'          => fetchLookup($pdo, 'YesNo'),
+        'states'         => $pdo->query("SELECT code, text FROM State ORDER BY text")->fetchAll(),
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ── Litter save ──────────────────────────────────────────────────────
+// POST ?type=litter-save
+// Body: JSON with litter, breedings[], pups[]
+
+if ($type === 'litter-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body = json_decode(file_get_contents('php://input'), true);
+    if (!$body) { http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit; }
+
+    $id = (int)($body['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'missing id']); exit; }
+
+    $check = $pdo->prepare("SELECT id FROM Litter WHERE id = :id");
+    $check->execute([':id' => $id]);
+    if (!$check->fetch()) { http_response_code(404); echo json_encode(['error' => 'litter not found']); exit; }
+
+    $nv  = fn($v) => ($v === '' || $v === null) ? null : $v;
+    $nvi = fn($v) => ($v === '' || $v === null) ? null : (int)$v;
+
+    try {
+        $pdo->beginTransaction();
+
+        // Update Litter
+        $pdo->prepare("UPDATE Litter SET
+            dateOfWhelp                    = :dateOfWhelp,
+            city                           = :city,
+            state                          = :state,
+            breeder                        = :breeder,
+            dam                            = :dam,
+            ownerOfDam                     = :ownerOfDam,
+            ownerOfSire                    = :ownerOfSire,
+            numberOfMalesBornLive          = :nml,
+            numberOfFemalesBornLive        = :nfl,
+            numberOfMalesStillborn         = :nms,
+            numberOfFemalesStillborn       = :nfs,
+            numberOfMalesSurviving         = :nmv,
+            numberOfFemalesSurviving       = :nfv,
+            naturalWhelping                = :nw,
+            plannedCaesarian               = :pc,
+            emergencyCaesarian             = :ec,
+            oxytocinPitocinBeforeLastWhelp = :ox,
+            numberDiedNaturalCauses        = :ndnc,
+            descriptionDiedNaturalCauses   = :ddnc,
+            numberDiedAccidently           = :nda,
+            descriptionOfAccidentalDeaths  = :doa,
+            numberEuthanized               = :ne,
+            reasonForEuthanasia            = :re,
+            numberSurvivingWithDefects     = :nsd,
+            descriptionsOfDefects          = :dod,
+            descriptionOfDefectsInStillborn= :dois,
+            registrarComment               = :rc
+            WHERE id = :id")->execute([
+            ':dateOfWhelp' => $nv($body['dateOfWhelp']),
+            ':city'        => $nv($body['whelpCity']),
+            ':state'       => $nv($body['whelpStateCode']),
+            ':breeder'     => $nvi($body['breederId']),
+            ':dam'         => $nvi($body['damId']),
+            ':ownerOfDam'  => $nvi($body['ownerOfDamId']),
+            ':ownerOfSire' => $nvi($body['ownerOfSireId']),
+            ':nml'  => $nvi($body['numberOfMalesBornLive']),
+            ':nfl'  => $nvi($body['numberOfFemalesBornLive']),
+            ':nms'  => $nvi($body['numberOfMalesStillborn']),
+            ':nfs'  => $nvi($body['numberOfFemalesStillborn']),
+            ':nmv'  => $nvi($body['numberOfMalesSurviving']),
+            ':nfv'  => $nvi($body['numberOfFemalesSurviving']),
+            ':nw'   => $nv($body['naturalWhelpingCode']),
+            ':pc'   => $nv($body['plannedCaesarianCode']),
+            ':ec'   => $nv($body['emergencyCaesarianCode']),
+            ':ox'   => $nv($body['oxytocinCode']),
+            ':ndnc' => $nvi($body['numberDiedNaturalCauses']),
+            ':ddnc' => $nv($body['descriptionDiedNaturalCauses']),
+            ':nda'  => $nvi($body['numberDiedAccidently']),
+            ':doa'  => $nv($body['descriptionOfAccidentalDeaths']),
+            ':ne'   => $nvi($body['numberEuthanized']),
+            ':re'   => $nv($body['reasonForEuthanasia']),
+            ':nsd'  => $nvi($body['numberSurvivingWithDefects']),
+            ':dod'  => $nv($body['descriptionsOfDefects']),
+            ':dois' => $nv($body['descriptionOfDefectsInStillborn']),
+            ':rc'   => $nv($body['registrarComment']),
+            ':id'   => $id,
+        ]);
+
+        // Update/insert breeding records
+        $primaryBreedingId = null;
+        foreach (($body['breedings'] ?? []) as $br) {
+            $bid = $nvi($br['id']);
+            if ($bid) {
+                $pdo->prepare("UPDATE Breeding SET
+                    sire                        = :sire,
+                    dateOfBreeding              = :dob,
+                    city                        = :city,
+                    state                       = :state,
+                    breedingMethod              = :method,
+                    damOwnerWitnessedBreeding   = :damWit,
+                    sireOwnerWitnessedBreeding  = :sireWit,
+                    descriptionOfMating         = :mating,
+                    descriptionOfPaternity      = :paternity
+                    WHERE id = :id AND litter = :lit")->execute([
+                    ':sire'      => $nvi($br['sireId']),
+                    ':dob'       => $nv($br['dateOfBreeding']),
+                    ':city'      => $nv($br['breedingCity']),
+                    ':state'     => $nv($br['breedingStateCode']),
+                    ':method'    => $nv($br['breedingMethodCode']),
+                    ':damWit'    => isset($br['damOwnerWitnessedBreeding']) ? (int)(bool)$br['damOwnerWitnessedBreeding'] : null,
+                    ':sireWit'   => isset($br['sireOwnerWitnessedBreeding']) ? (int)(bool)$br['sireOwnerWitnessedBreeding'] : null,
+                    ':mating'    => $nv($br['descriptionOfMating']),
+                    ':paternity' => $nv($br['descriptionOfPaternity']),
+                    ':id'        => $bid,
+                    ':lit'       => $id,
+                ]);
+                if (!$primaryBreedingId) $primaryBreedingId = $bid;
+            } else {
+                // New breeding record
+                $pdo->prepare("INSERT INTO Breeding
+                    (litter, sire, dateOfBreeding, city, state, breedingMethod,
+                     damOwnerWitnessedBreeding, sireOwnerWitnessedBreeding,
+                     descriptionOfMating, descriptionOfPaternity)
+                    VALUES (:lit,:sire,:dob,:city,:state,:method,:damWit,:sireWit,:mating,:paternity)")->execute([
+                    ':lit'       => $id,
+                    ':sire'      => $nvi($br['sireId']),
+                    ':dob'       => $nv($br['dateOfBreeding']),
+                    ':city'      => $nv($br['breedingCity']),
+                    ':state'     => $nv($br['breedingStateCode']),
+                    ':method'    => $nv($br['breedingMethodCode']),
+                    ':damWit'    => isset($br['damOwnerWitnessedBreeding']) ? (int)(bool)$br['damOwnerWitnessedBreeding'] : null,
+                    ':sireWit'   => isset($br['sireOwnerWitnessedBreeding']) ? (int)(bool)$br['sireOwnerWitnessedBreeding'] : null,
+                    ':mating'    => $nv($br['descriptionOfMating']),
+                    ':paternity' => $nv($br['descriptionOfPaternity']),
+                ]);
+                if (!$primaryBreedingId) $primaryBreedingId = (int)$pdo->lastInsertId();
+            }
+        }
+
+        // Update/insert pups
+        $displayOrder = 0;
+        foreach (($body['pups'] ?? []) as $pup) {
+            $pid = $nvi($pup['id']);
+            if ($pid) {
+                // Update Dog
+                $pdo->prepare("UPDATE Dog SET
+                    name          = :name,
+                    puppyLetter   = :letter,
+                    displayOrder  = :ord,
+                    sex           = :sex,
+                    coatColor     = :color,
+                    owner         = :owner,
+                    beneficiary   = :beneficiary
+                    WHERE id = :id")->execute([
+                    ':name'        => $nv($pup['name']),
+                    ':letter'      => $nv($pup['puppyLetter']),
+                    ':ord'         => $displayOrder,
+                    ':sex'         => $nv($pup['sexCode']),
+                    ':color'       => $nv($pup['coatColorCode']),
+                    ':owner'       => $nvi($pup['ownerId']),
+                    ':beneficiary' => $nvi($pup['beneficiaryId']),
+                    ':id'          => $pid,
+                ]);
+                // Get or create DogDetail
+                $drow = $pdo->prepare("SELECT details FROM Dog WHERE id = :id");
+                $drow->execute([':id' => $pid]);
+                $detailId = (int)($drow->fetchColumn() ?: 0);
+                if (!$detailId) {
+                    $pdo->prepare("INSERT INTO DogDetail () VALUES ()")->execute();
+                    $detailId = (int)$pdo->lastInsertId();
+                    $pdo->prepare("UPDATE Dog SET details = :did WHERE id = :id")
+                        ->execute([':did' => $detailId, ':id' => $pid]);
+                }
+                $pdo->prepare("UPDATE DogDetail SET
+                    callNames       = :callNames,
+                    microchipNumber = :chip,
+                    microchipType   = :chipType,
+                    tattooNumber    = :tattoo,
+                    tail            = :tail,
+                    rearDewClaws    = :dewclaws,
+                    blueEyes        = :blueEyes
+                    WHERE id = :id")->execute([
+                    ':callNames' => $nv($pup['callNames']),
+                    ':chip'      => $nv($pup['microchipNumber']),
+                    ':chipType'  => $nv($pup['microchipTypeCode']),
+                    ':tattoo'    => $nv($pup['tattooNumber']),
+                    ':tail'      => $nv($pup['tailCode']),
+                    ':dewclaws'  => $nv($pup['rearDewClawsCode']),
+                    ':blueEyes'  => $nv($pup['blueEyesCode']),
+                    ':id'        => $detailId,
+                ]);
+            } else {
+                // New pup — requires a breeding id
+                $breedId = $nvi($pup['breedingId']) ?: $primaryBreedingId;
+                if (!$breedId) continue;
+                // Insert DogDetail first
+                $pdo->prepare("INSERT INTO DogDetail
+                    (callNames, microchipNumber, microchipType, tattooNumber, tail, rearDewClaws, blueEyes)
+                    VALUES (:callNames,:chip,:chipType,:tattoo,:tail,:dewclaws,:blueEyes)")->execute([
+                    ':callNames' => $nv($pup['callNames']),
+                    ':chip'      => $nv($pup['microchipNumber']),
+                    ':chipType'  => $nv($pup['microchipTypeCode']),
+                    ':tattoo'    => $nv($pup['tattooNumber']),
+                    ':tail'      => $nv($pup['tailCode']),
+                    ':dewclaws'  => $nv($pup['rearDewClawsCode']),
+                    ':blueEyes'  => $nv($pup['blueEyesCode']),
+                ]);
+                $detailId = (int)$pdo->lastInsertId();
+                $pdo->prepare("INSERT INTO Dog
+                    (name, puppyLetter, displayOrder, sex, coatColor,
+                     owner, beneficiary, breeding, details)
+                    VALUES (:name,:letter,:ord,:sex,:color,:owner,:beneficiary,:breeding,:details)")->execute([
+                    ':name'        => $nv($pup['name']),
+                    ':letter'      => $nv($pup['puppyLetter']),
+                    ':ord'         => $displayOrder,
+                    ':sex'         => $nv($pup['sexCode']),
+                    ':color'       => $nv($pup['coatColorCode']),
+                    ':owner'       => $nvi($pup['ownerId']),
+                    ':beneficiary' => $nvi($pup['beneficiaryId']),
+                    ':breeding'    => $breedId,
+                    ':details'     => $detailId ?: null,
+                ]);
+            }
+            $displayOrder++;
+        }
+
+        $pdo->commit();
+        echo json_encode(['ok' => true, 'id' => $id]);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
     exit;
 }
 
