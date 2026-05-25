@@ -336,12 +336,14 @@ if ($type === 'dog') {
     $littermates = [];
     if ($dog['litterId']) {
         $stmt = $pdo->prepare("
-            SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex
+            SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex,
+                   d2.puppyLetter, ll.litterNumber
             FROM   Dog     d2
             JOIN   Breeding b2 ON b2.id = d2.breeding AND b2.litter = :lit
+            LEFT JOIN Litter ll ON ll.id = b2.litter
             LEFT JOIN Sex  sx ON sx.code = d2.sex
             WHERE  d2.id != :did
-            ORDER  BY d2.name
+            ORDER  BY d2.displayOrder, d2.puppyLetter, d2.name
         ");
         $stmt->bindValue(':lit', $dog['litterId'], PDO::PARAM_INT);
         $stmt->bindValue(':did', $id,              PDO::PARAM_INT);
@@ -353,7 +355,8 @@ if ($type === 'dog') {
     $fullSiblings = [];
     if ($dog['sireId'] && $dog['damId'] && $dog['litterId']) {
         $stmt = $pdo->prepare("
-            SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp
+            SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp,
+                   d2.puppyLetter, l2.litterNumber
             FROM   Breeding b2
             JOIN   Litter   l2 ON l2.id = b2.litter AND l2.dam = :dam AND l2.id != :lit
             JOIN   Dog      d2 ON d2.breeding = b2.id AND d2.id != :did
@@ -373,7 +376,8 @@ if ($type === 'dog') {
     $progeny = [];
     $stmt = $pdo->prepare("
         SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex,
-               l.id AS litterId, l.dateOfWhelp,
+               l.id AS litterId, l.dateOfWhelp, l.litterNumber,
+               d2.puppyLetter,
                dm.id AS damId, dm.name AS damName, dm.registrationNumber AS damReg
         FROM   Breeding b
         JOIN   Litter   l  ON l.id  = b.litter
@@ -396,6 +400,7 @@ if ($type === 'dog') {
             // Exclude full siblings: require sire to be different (or unknown)
             $stmt = $pdo->prepare("
                 SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp,
+                       d2.puppyLetter, l2.litterNumber,
                        ds2.id AS sireId, ds2.name AS sireName
                 FROM   Litter   l2
                 JOIN   Breeding b2  ON b2.litter = l2.id AND (b2.sire IS NULL OR b2.sire != :sire)
@@ -410,6 +415,7 @@ if ($type === 'dog') {
             // No known sire — include all other-litter same-dam dogs
             $stmt = $pdo->prepare("
                 SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp,
+                       d2.puppyLetter, l2.litterNumber,
                        ds2.id AS sireId, ds2.name AS sireName
                 FROM   Litter   l2
                 JOIN   Breeding b2  ON b2.litter = l2.id
@@ -434,6 +440,7 @@ if ($type === 'dog') {
         if ($dog['damId']) {
             $stmt = $pdo->prepare("
                 SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp,
+                       d2.puppyLetter, l2.litterNumber,
                        dl2.id AS damId, dl2.name AS damName
                 FROM   Breeding b2
                 JOIN   Litter   l2  ON l2.id = b2.litter AND l2.id != :lit
@@ -448,6 +455,7 @@ if ($type === 'dog') {
         } else {
             $stmt = $pdo->prepare("
                 SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp,
+                       d2.puppyLetter, l2.litterNumber,
                        dl2.id AS damId, dl2.name AS damName
                 FROM   Breeding b2
                 JOIN   Litter   l2  ON l2.id = b2.litter AND l2.id != :lit
@@ -604,6 +612,7 @@ if ($type === 'person') {
     // Litters bred: return pups with litter context so JS can group them
     $stmt = $pdo->prepare("
         SELECT d.id, d.name, d.registrationNumber, sx.text AS sex,
+               d.puppyLetter,
                l.id AS litterId, l.dateOfWhelp, l.litterNumber,
                dam.id   AS damId,  dam.name  AS damName,  dam.registrationNumber  AS damReg,
                sire.id  AS sireId, sire.name AS sireName, sire.registrationNumber AS sireReg
@@ -614,7 +623,7 @@ if ($type === 'person') {
         LEFT JOIN Dog   sire ON sire.id = b.sire
         LEFT JOIN Sex   sx   ON sx.code = d.sex
         WHERE  l.breeder = :id
-        ORDER  BY l.dateOfWhelp, l.id, d.name
+        ORDER  BY l.dateOfWhelp, l.id, d.displayOrder, d.puppyLetter, d.name
     ");
     $stmt->execute([':id' => $id]);
     $litterPups = $stmt->fetchAll();

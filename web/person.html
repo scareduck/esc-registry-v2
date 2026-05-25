@@ -385,7 +385,7 @@ function renderLitterGroups(groups, sortMode) {
         </tr></thead><tbody>`;
         for (const p of g.pups) {
             body += `<tr>
-                <td><a href="dog.html?id=${p.id}">${esc(p.name||'(unnamed)')}</a></td>
+                <td><a href="dog.html?id=${p.id}">${esc(dogName(p))}</a></td>
                 <td>${esc(p.registrationNumber||'—')}</td>
                 <td>${esc(p.sex||'—')}</td>
             </tr>`;
@@ -482,6 +482,14 @@ function fmtDate(s) {
     const [y, m, day] = d.split('-');
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return `${months[parseInt(m,10)-1]} ${parseInt(day,10)}, ${y}`;
+}
+
+function dogName(d) {
+    if (d.name) return d.name;
+    const sex = d.sex || '';
+    const base = 'Unnamed' + (sex ? ' ' + sex : '') + ' Puppy';
+    if (d.litterNumber && d.puppyLetter) return base + ' ESC-L' + d.litterNumber + d.puppyLetter;
+    return base;
 }
 
 function esc(s) {

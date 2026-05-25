@@ -300,7 +300,7 @@ function render(data) {
                 <div class="pup-header">
                     <span class="pup-code">${esc(code)}</span>
                     <span class="pup-sex">${esc(p.sex || '')}</span>
-                    <a class="pup-name" href="dog.html?id=${p.id}">${esc(p.name || '(unnamed)')}</a>
+                    <a class="pup-name" href="dog.html?id=${p.id}">${esc(pupName(p, litter))}</a>
                     ${reg ? `<span class="pup-reg">${esc(reg)}</span>` : ''}
                 </div>
                 <div class="pup-body">
@@ -398,6 +398,14 @@ function fmtDate(s) {
     const [y, m, day] = d.split('-');
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return `${months[parseInt(m,10)-1]} ${parseInt(day,10)}, ${y}`;
+}
+
+function pupName(p, litter) {
+    if (p.name) return p.name;
+    const sex = p.sex || '';
+    const base = 'Unnamed' + (sex ? ' ' + sex : '') + ' Puppy';
+    if (litter.litterNumber && p.puppyLetter) return base + ' ESC-L' + litter.litterNumber + p.puppyLetter;
+    return base;
 }
 
 function esc(s) {

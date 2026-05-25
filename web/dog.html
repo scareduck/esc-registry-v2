@@ -270,14 +270,15 @@ function render(data) {
     const { dog, detail, occupations, healthProblems, otherMarkings,
             pedigree, littermates, fullSiblings, maternalHalf, paternalHalf, progeny } = data;
 
-    document.title = (dog.name || 'Dog') + ' — ESCR Registry Explorer';
-    document.getElementById('page-title').textContent = dog.name || '(unnamed)';
+    const subjectName = dogName(dog);
+    document.title = subjectName + ' — ESCR Registry Explorer';
+    document.getElementById('page-title').textContent = subjectName;
 
     let html = '';
 
     // ── Mast ──────────────────────────────────────────────────────────
     html += `<div class="mast">
-        <div class="mast-name">${esc(dog.name || '(unnamed)')}</div>
+        <div class="mast-name">${esc(subjectName)}</div>
         ${dog.registrationNumber ? `<div class="mast-reg"><span style="font-size:12px;color:#80868b;margin-right:6px">ESC Reg #</span>ESC-${esc(dog.registrationNumber)}</div>` : ''}
         <div class="mast-grid">`;
 
@@ -478,7 +479,7 @@ function dogListTable(dogs, showDate) {
     </tr></thead><tbody>`;
     for (const d of dogs) {
         html += `<tr>
-            <td><a href="dog.html?id=${d.id}">${esc(d.name||'(unnamed)')}</a></td>
+            <td><a href="dog.html?id=${d.id}">${esc(dogName(d))}</a></td>
             <td>${d.registrationNumber ? 'ESC-'+esc(d.registrationNumber) : '—'}</td>
             <td>${esc(d.sex||'—')}</td>
             ${showDate ? `<td>${fmtDate(d.dateOfWhelp)||'—'}</td>` : ''}
@@ -510,7 +511,7 @@ function renderHalfSiblings(dogs, idKey, nameKey, parentLabel) {
         </tr></thead><tbody>`;
         for (const d of g.dogs) {
             html += `<tr>
-                <td><a href="dog.html?id=${d.id}">${esc(d.name||'(unnamed)')}</a></td>
+                <td><a href="dog.html?id=${d.id}">${esc(dogName(d))}</a></td>
                 <td>${d.registrationNumber ? 'ESC-'+esc(d.registrationNumber) : '—'}</td>
                 <td>${esc(d.sex||'—')}</td>
                 <td>${fmtDate(d.dateOfWhelp)||'—'}</td>
@@ -539,7 +540,7 @@ function renderProgeny(progeny) {
             <table class="dog-table"><thead><tr><th>Name</th><th>Reg #</th><th>Sex</th></tr></thead><tbody>`;
         for (const p of g.pups) {
             html += `<tr>
-                <td><a href="dog.html?id=${p.id}">${esc(p.name||'(unnamed)')}</a></td>
+                <td><a href="dog.html?id=${p.id}">${esc(dogName(p))}</a></td>
                 <td>${esc(p.registrationNumber||'—')}</td>
                 <td>${esc(p.sex||'—')}</td>
             </tr>`;
@@ -677,6 +678,14 @@ function esc(s) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+function dogName(d) {
+    if (d.name) return d.name;
+    const sex = d.sex || '';
+    const base = 'Unnamed' + (sex ? ' ' + sex : '') + ' Puppy';
+    if (d.litterNumber && d.puppyLetter) return base + ' ESC-L' + d.litterNumber + d.puppyLetter;
+    return base;
 }
 </script>
 </body>
