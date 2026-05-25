@@ -67,6 +67,10 @@ logs/
 *.parquet
 *.jsonl
 
+# Photos are served locally via symlinks or copies; never commit them
+web/photos/*
+!web/photos/.gitkeep
+
 # ESCR registry data safety
 # Do not commit real registry exports, local MariaDB dumps, or generated reports
 # containing member, owner, breeder, registrar, or dog records.
