@@ -387,16 +387,96 @@ if ($type === 'dog') {
     $stmt->execute();
     $progeny = $stmt->fetchAll();
 
+    // Maternal half-siblings: same dam, different litter, different sire
+    // (dogs with same sire+dam are already in fullSiblings)
+    $maternalHalf = [];
+    if ($dog['damId']) {
+        $litId = $dog['litterId'] ?: 0;   // 0 never matches a real litter id
+        if ($dog['sireId']) {
+            // Exclude full siblings: require sire to be different (or unknown)
+            $stmt = $pdo->prepare("
+                SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp,
+                       ds2.id AS sireId, ds2.name AS sireName
+                FROM   Litter   l2
+                JOIN   Breeding b2  ON b2.litter = l2.id AND (b2.sire IS NULL OR b2.sire != :sire)
+                JOIN   Dog      d2  ON d2.breeding = b2.id AND d2.id != :did
+                LEFT JOIN Dog   ds2 ON ds2.id = b2.sire
+                LEFT JOIN Sex   sx  ON sx.code = d2.sex
+                WHERE  l2.dam = :dam AND l2.id != :lit
+                ORDER  BY l2.dateOfWhelp, d2.name
+            ");
+            $stmt->bindValue(':sire', $dog['sireId'], PDO::PARAM_INT);
+        } else {
+            // No known sire — include all other-litter same-dam dogs
+            $stmt = $pdo->prepare("
+                SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp,
+                       ds2.id AS sireId, ds2.name AS sireName
+                FROM   Litter   l2
+                JOIN   Breeding b2  ON b2.litter = l2.id
+                JOIN   Dog      d2  ON d2.breeding = b2.id AND d2.id != :did
+                LEFT JOIN Dog   ds2 ON ds2.id = b2.sire
+                LEFT JOIN Sex   sx  ON sx.code = d2.sex
+                WHERE  l2.dam = :dam AND l2.id != :lit
+                ORDER  BY l2.dateOfWhelp, d2.name
+            ");
+        }
+        $stmt->bindValue(':did', $id,                PDO::PARAM_INT);
+        $stmt->bindValue(':dam', $dog['damId'],       PDO::PARAM_INT);
+        $stmt->bindValue(':lit', $litId,              PDO::PARAM_INT);
+        $stmt->execute();
+        $maternalHalf = $stmt->fetchAll();
+    }
+
+    // Paternal half-siblings: same sire, different litter, different dam
+    $paternalHalf = [];
+    if ($dog['sireId']) {
+        $litId = $dog['litterId'] ?: 0;
+        if ($dog['damId']) {
+            $stmt = $pdo->prepare("
+                SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp,
+                       dl2.id AS damId, dl2.name AS damName
+                FROM   Breeding b2
+                JOIN   Litter   l2  ON l2.id = b2.litter AND l2.id != :lit
+                                    AND (l2.dam IS NULL OR l2.dam != :dam)
+                JOIN   Dog      d2  ON d2.breeding = b2.id AND d2.id != :did
+                LEFT JOIN Dog   dl2 ON dl2.id = l2.dam
+                LEFT JOIN Sex   sx  ON sx.code = d2.sex
+                WHERE  b2.sire = :sire
+                ORDER  BY l2.dateOfWhelp, d2.name
+            ");
+            $stmt->bindValue(':dam', $dog['damId'], PDO::PARAM_INT);
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT d2.id, d2.name, d2.registrationNumber, sx.text AS sex, l2.dateOfWhelp,
+                       dl2.id AS damId, dl2.name AS damName
+                FROM   Breeding b2
+                JOIN   Litter   l2  ON l2.id = b2.litter AND l2.id != :lit
+                JOIN   Dog      d2  ON d2.breeding = b2.id AND d2.id != :did
+                LEFT JOIN Dog   dl2 ON dl2.id = l2.dam
+                LEFT JOIN Sex   sx  ON sx.code = d2.sex
+                WHERE  b2.sire = :sire
+                ORDER  BY l2.dateOfWhelp, d2.name
+            ");
+        }
+        $stmt->bindValue(':did',  $id,               PDO::PARAM_INT);
+        $stmt->bindValue(':sire', $dog['sireId'],     PDO::PARAM_INT);
+        $stmt->bindValue(':lit',  $litId,             PDO::PARAM_INT);
+        $stmt->execute();
+        $paternalHalf = $stmt->fetchAll();
+    }
+
     echo json_encode([
-        'dog'          => $dog,
-        'detail'       => $detail,
-        'occupations'  => $occupations,
-        'healthProblems' => $healthProbs,
-        'otherMarkings' => $otherMarkings,
-        'pedigree'     => $pedigree,
-        'littermates'  => $littermates,
-        'fullSiblings' => $fullSiblings,
-        'progeny'      => $progeny,
+        'dog'              => $dog,
+        'detail'           => $detail,
+        'occupations'      => $occupations,
+        'healthProblems'   => $healthProbs,
+        'otherMarkings'    => $otherMarkings,
+        'pedigree'         => $pedigree,
+        'littermates'      => $littermates,
+        'fullSiblings'     => $fullSiblings,
+        'maternalHalf'     => $maternalHalf,
+        'paternalHalf'     => $paternalHalf,
+        'progeny'          => $progeny,
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }

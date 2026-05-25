@@ -268,7 +268,7 @@ function render(data) {
     }
 
     const { dog, detail, occupations, healthProblems, otherMarkings,
-            pedigree, littermates, fullSiblings, progeny } = data;
+            pedigree, littermates, fullSiblings, maternalHalf, paternalHalf, progeny } = data;
 
     document.title = (dog.name || 'Dog') + ' — ESCR Registry Explorer';
     document.getElementById('page-title').textContent = dog.name || '(unnamed)';
@@ -417,6 +417,22 @@ function render(data) {
         html += section('Full Siblings', dogListTable(fullSiblings, true));
     }
 
+    // ── Half Siblings ─────────────────────────────────────────────────
+    if (maternalHalf && maternalHalf.length) {
+        const damLink = dog.damId
+            ? `<a href="dog.html?id=${dog.damId}" style="font-weight:400;font-size:12px;text-transform:none;letter-spacing:0;color:#1a73e8">${esc(dog.damName||'(unnamed)')}</a>`
+            : '';
+        html += section(`Maternal Half-Siblings ${damLink}`,
+            renderHalfSiblings(maternalHalf, 'sireId', 'sireName', 'Sire'));
+    }
+    if (paternalHalf && paternalHalf.length) {
+        const sireLink = dog.sireId
+            ? `<a href="dog.html?id=${dog.sireId}" style="font-weight:400;font-size:12px;text-transform:none;letter-spacing:0;color:#1a73e8">${esc(dog.sireName||'(unnamed)')}</a>`
+            : '';
+        html += section(`Paternal Half-Siblings ${sireLink}`,
+            renderHalfSiblings(paternalHalf, 'damId', 'damName', 'Dam'));
+    }
+
     // ── Progeny ───────────────────────────────────────────────────────
     if (progeny.length) {
         html += section('Progeny', renderProgeny(progeny));
@@ -469,6 +485,40 @@ function dogListTable(dogs, showDate) {
         </tr>`;
     }
     html += `</tbody></table>`;
+    return html;
+}
+
+function renderHalfSiblings(dogs, idKey, nameKey, parentLabel) {
+    // Group by the other parent; null/unknown parents grouped together
+    const groups = new Map();
+    for (const d of dogs) {
+        const key = d[idKey] ?? 0;
+        if (!groups.has(key)) groups.set(key, { id: d[idKey], name: d[nameKey], dogs: [] });
+        groups.get(key).dogs.push(d);
+    }
+    let html = '';
+    for (const g of groups.values()) {
+        const parentLink = g.id
+            ? `<a href="dog.html?id=${g.id}">${esc(g.name||'(unnamed)')}</a>`
+            : '(unknown)';
+        if (groups.size > 1) {
+            html += `<div class="progeny-group-head">${esc(parentLabel)}: ${parentLink}</div>`;
+        }
+        html += `<table class="dog-table"><thead><tr>
+            <th>Name</th><th>Reg #</th><th>Sex</th><th>Born</th>
+            ${groups.size === 1 ? `<th>${esc(parentLabel)}</th>` : ''}
+        </tr></thead><tbody>`;
+        for (const d of g.dogs) {
+            html += `<tr>
+                <td><a href="dog.html?id=${d.id}">${esc(d.name||'(unnamed)')}</a></td>
+                <td>${d.registrationNumber ? 'ESC-'+esc(d.registrationNumber) : '—'}</td>
+                <td>${esc(d.sex||'—')}</td>
+                <td>${fmtDate(d.dateOfWhelp)||'—'}</td>
+                ${groups.size === 1 ? `<td>${parentLink}</td>` : ''}
+            </tr>`;
+        }
+        html += `</tbody></table>`;
+    }
     return html;
 }
 
