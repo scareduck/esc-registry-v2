@@ -55,6 +55,7 @@ logs/
 
 # Local databases, dumps, and generated data
 *.sql
+!sql/*.sql
 *.sql.gz
 *.dump
 *.backup
