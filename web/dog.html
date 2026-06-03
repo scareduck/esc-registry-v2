@@ -267,8 +267,9 @@ function render(data) {
         return;
     }
 
-    const { dog, detail, occupations, healthProblems, otherMarkings,
-            pedigree, littermates, fullSiblings, maternalHalf, paternalHalf, progeny } = data;
+    const { dog, detail, photos, externalRegistrations, titles, occupations, healthProblems,
+            otherMarkings, pedigree, littermates, fullSiblings, maternalHalf, paternalHalf, progeny } = data;
+    const exr = externalRegistrations || {};
 
     const subjectName = dogName(dog);
     document.title = subjectName + ' — ESCR Registry Explorer';
@@ -309,14 +310,13 @@ function render(data) {
     // ── Registration ──────────────────────────────────────────────────
     if (detail) {
         const regRows = [];
-        if (detail.callNames)               regRows.push(['Call Name(s)',       esc(detail.callNames)]);
-        if (detail.ukcRegistrationNumber)   regRows.push(['UKC Reg #',          esc(detail.ukcRegistrationNumber) + (detail.ukcRegisteredName ? ' — ' + esc(detail.ukcRegisteredName) : '')]);
-        if (detail.iesrRegistrationNumber)  regRows.push(['IESR Reg #',         esc(detail.iesrRegistrationNumber) + (detail.iesrRegisteredName ? ' — ' + esc(detail.iesrRegisteredName) : '')]);
-        if (detail.arfRegistrationNumber)   regRows.push(['ARF Reg #',          esc(detail.arfRegistrationNumber) + (detail.arfRegisteredName ? ' — ' + esc(detail.arfRegisteredName) : '')]);
-        if (detail.nkcRegistrationNumber)   regRows.push(['NKC Reg #',          esc(detail.nkcRegistrationNumber) + (detail.nkcRegisteredName ? ' — ' + esc(detail.nkcRegisteredName) : '')]);
-        if (detail.otherRegistrationNumber) regRows.push(['Other Reg #',        esc(detail.otherRegistrationNumber) + (detail.otherRegisteredName ? ' — ' + esc(detail.otherRegisteredName) : '')]);
-        if (detail.microchipNumber)         regRows.push(['Microchip',          esc(detail.microchipNumber) + (detail.microchipTypeText ? ' (' + esc(detail.microchipTypeText) + ')' : '') + (detail.microchipRegistryText ? ', ' + esc(detail.microchipRegistryText) : '')]);
-        if (detail.tattooNumber)            regRows.push(['Tattoo',             esc(detail.tattooNumber) + (detail.tattooRegistry ? ' (' + esc(detail.tattooRegistry) + ')' : '')]);
+        if (detail.callNames) regRows.push(['Call Name(s)', esc(detail.callNames)]);
+        for (const [key, label] of [['UKC','UKC Reg #'],['IESR','IESR Reg #'],['ARF','ARF Reg #'],['NKC','NKC Reg #'],['Other','Other Reg #']]) {
+            const r = exr[key];
+            if (r?.registrationNumber) regRows.push([label, esc(r.registrationNumber) + (r.registeredName ? ' — ' + esc(r.registeredName) : '')]);
+        }
+        if (detail.microchipNumber)  regRows.push(['Microchip', esc(detail.microchipNumber) + (detail.microchipTypeText ? ' (' + esc(detail.microchipTypeText) + ')' : '') + (detail.microchipRegistryText ? ', ' + esc(detail.microchipRegistryText) : '')]);
+        if (detail.tattooNumber)     regRows.push(['Tattoo',    esc(detail.tattooNumber) + (detail.tattooRegistry ? ' (' + esc(detail.tattooRegistry) + ')' : '')]);
         if (regRows.length) {
             html += section('Registration', kvGrid(regRows));
         }
@@ -329,10 +329,10 @@ function render(data) {
         if (detail.ofaElbowsResultText)    healthRows.push(['OFA Elbows',        esc(detail.ofaElbowsResultText) + ageStr(detail.ofaElbowsAgeInMonths)]);
         if (detail.pennHIPDILeft || detail.pennHIPDIRight)
                                            healthRows.push(['PennHIP DI (L/R)',  [detail.pennHIPDILeft, detail.pennHIPDIRight].filter(Boolean).map(esc).join(' / ') + ageStr(detail.pennHIPAgeInMonths)]);
-        if (detail.pennHIPDJDLeftText || detail.pennHIPDJDRightText)
-                                           healthRows.push(['PennHIP DJD (L/R)', [detail.pennHIPDJDLeftText, detail.pennHIPDJDRightText].filter(Boolean).map(esc).join(' / ')]);
-        if (detail.pennHIPCavLeftText || detail.pennHIPCavRightText)
-                                           healthRows.push(['PennHIP Cav. (L/R)',[detail.pennHIPCavLeftText, detail.pennHIPCavRightText].filter(Boolean).map(esc).join(' / ')]);
+        if (detail.pennHIPDJDLeft || detail.pennHIPDJDRight)
+                                           healthRows.push(['PennHIP DJD (L/R)', [detail.pennHIPDJDLeft ? 'Yes' : null, detail.pennHIPDJDRight ? 'Yes' : null].filter(Boolean).join(' / ')]);
+        if (detail.pennHIPCavitationLeft || detail.pennHIPCavitationRight)
+                                           healthRows.push(['PennHIP Cav. (L/R)',[detail.pennHIPCavitationLeft ? 'Yes' : null, detail.pennHIPCavitationRight ? 'Yes' : null].filter(Boolean).join(' / ')]);
         if (detail.gdcHipsResult)          healthRows.push(['GDC Hips',          esc(detail.gdcHipsResult)       + ageStr(detail.gdcHipsAgeInMonths)]);
         if (detail.cerfResultText)         healthRows.push(['CERF',              esc(detail.cerfResultText)      + ageStr(detail.cerfAgeInMonths)]);
         if (detail.mdr1ResultText)         healthRows.push(['MDR1',              esc(detail.mdr1ResultText)      + ageStr(detail.mdr1GeneticMutationAgeInMonths)]);
@@ -350,15 +350,17 @@ function render(data) {
     // ── Physical ──────────────────────────────────────────────────────
     if (detail) {
         const physRows = [];
-        if (detail.adultHeight)           physRows.push(['Height',        esc(detail.adultHeight + '"') + ageStr(detail.adultHeightAgeInMonths)]);
-        if (detail.adultWeight)           physRows.push(['Weight',        esc(detail.adultWeight + ' lbs') + ageStr(detail.adultWeightAgeInMonths)]);
-        if (detail.detailCoatColorText)   physRows.push(['Coat Color',    esc(detail.detailCoatColorText)]);
-        if (detail.whiteMarkingsText)     physRows.push(['White Markings',esc(detail.whiteMarkingsText)]);
-        if (otherMarkings.length)         physRows.push(['Other Markings',otherMarkings.map(m => `<span class="tag tag-neutral">${esc(m)}</span>`).join('')]);
-        if (detail.tailText)              physRows.push(['Tail',          esc(detail.tailText)]);
-        if (detail.blueEyesText)          physRows.push(['Blue Eyes',     esc(detail.blueEyesText)]);
-        if (detail.rearDewClawsText)      physRows.push(['Rear Dew Claws',esc(detail.rearDewClawsText)]);
-        if (detail.spayNeuterIntactText)  physRows.push(['Spay/Neuter',   esc(detail.spayNeuterIntactText) + ageStr(detail.spayNeuterAgeInMonths)]);
+        if (detail.adultHeight)                    physRows.push(['Height',        esc(detail.adultHeight + '"') + ageStr(detail.adultHeightAgeInMonths)]);
+        if (detail.adultWeight)                    physRows.push(['Weight',        esc(detail.adultWeight + ' lbs') + ageStr(detail.adultWeightAgeInMonths)]);
+        if (detail.whiteMarkingsText && detail.whiteMarkingsText !== 'Unknown')
+                                                   physRows.push(['White Markings',esc(detail.whiteMarkingsText)]);
+        if (otherMarkings.length)                  physRows.push(['Other Markings',otherMarkings.map(m => `<span class="tag tag-neutral">${esc(m)}</span>`).join('')]);
+        if (detail.tailText && detail.tailText !== 'Unknown')
+                                                   physRows.push(['Tail',          esc(detail.tailText)]);
+        if (detail.blueEyes)                       physRows.push(['Blue Eyes',     'Yes']);
+        if (detail.rearDewClaws)                   physRows.push(['Rear Dew Claws','Yes']);
+        if (detail.spayNeuterIntactText && detail.spayNeuterIntactText !== 'Unknown')
+                                                   physRows.push(['Spay/Neuter',   esc(detail.spayNeuterIntactText) + ageStr(detail.spayNeuterAgeInMonths)]);
         if (physRows.length) {
             html += section('Physical', kvGrid(physRows));
         }
@@ -367,7 +369,7 @@ function render(data) {
     // ── Working & Occupations ─────────────────────────────────────────
     if (detail) {
         const workRows = [];
-        if (detail.farmOrRanchDogText)    workRows.push(['Farm/Ranch Dog', esc(detail.farmOrRanchDogText)]);
+        if (detail.farmOrRanchDog)         workRows.push(['Farm/Ranch Dog', 'Yes']);
         if (occupations.length)           workRows.push(['Occupations',    occupations.map(o => `<span class="tag">${esc(o)}</span>`).join('')]);
         const livestock = [
             ['Dairy Cattle', detail.dairyCattle], ['Beef Cattle', detail.beefCattle],
@@ -381,24 +383,12 @@ function render(data) {
     }
 
     // ── Titles & Activities ───────────────────────────────────────────
-    if (detail) {
-        const titleRows = [
-            ['AWFA',            detail.awfaTitles],
-            ['Herding',         detail.herdingTitles],
-            ['SAR',             detail.sarTitles],
-            ['Obedience',       detail.obedienceTitles],
-            ['Rally/Obedience', detail.rallyObedienceTitles],
-            ['Freestyle',       detail.freestyleTitles],
-            ['Agility',         detail.agilityTitles],
-            ['Flyball',         detail.flyballTitles],
-            ['Temperament',     detail.temperamentTitles],
-            ['Therapy',         detail.therapyTitles],
-            ['CGC/CGN',         detail.cgcCgnTitles],
-            ['Protection',      detail.protectionTitles],
-            ['Other',           detail.otherTitles],
-        ].filter(([,v]) => v);
+    if (titles && Object.keys(titles).length) {
+        const order = ['AWFA','Herding','SAR','Obedience','Rally Obedience','Freestyle',
+                       'Agility','Flyball','Temperament','Therapy','CGC/CGN','Protection','Service','Other'];
+        const titleRows = order.filter(d => titles[d]).map(d => [d, esc(titles[d])]);
         if (titleRows.length) {
-            html += section('Titles &amp; Activities', kvGrid(titleRows.map(([l,v]) => [l, esc(v)])));
+            html += section('Titles &amp; Activities', kvGrid(titleRows));
         }
     }
 
@@ -440,7 +430,7 @@ function render(data) {
     }
 
     // ── Photos ────────────────────────────────────────────────────────
-    html += section('Photos', renderPhotos(dog.id, detail));
+    html += section('Photos', renderPhotos(dog.id, photos));
 
     // ── Owner's Description ───────────────────────────────────────────
     if (detail && detail.ownersDescription) {
@@ -627,18 +617,18 @@ function fmtDate(s) {
 
 // ── Photos ───────────────────────────────────────────────────────────
 
-function renderPhotos(dogId, detail) {
-    // URL pattern: https://www.esc-registry.org/photos/DogId{id}_{n}.{ext}
-    // Extension is not stored; try jpg → jpeg → png in order.
-    const EXTS = ['jpg', 'jpeg', 'png'];
-    const BASE  = 'photos/';
+function renderPhotos(dogId, photos) {
+    // photos is [{idx, caption}, ...] — only indices with a caption are included.
+    // Physical files follow DogId{id}_{n}.{ext}; extension not stored, try jpg → jpeg → png.
+    const BASE = 'photos/';
+    const captionMap = {};
+    for (const p of (photos || [])) captionMap[p.idx] = p.caption || '';
 
     let html = '<div class="photo-grid" id="photo-grid">';
     for (let i = 0; i < 10; i++) {
-        const caption  = detail ? (detail['photoCaption' + i] || '') : '';
+        const caption  = captionMap[i] ?? '';
         const baseUrl  = BASE + 'DogId' + dogId + '_' + i;
         const captHtml = caption ? `<div class="photo-caption">${esc(caption)}</div>` : '';
-        // Start with .jpg; onerror falls through other extensions then hides the slot.
         html += `<div class="photo-item" id="pi-${i}">
             <img src="${baseUrl}.jpg"
                  alt="${esc(caption)}"

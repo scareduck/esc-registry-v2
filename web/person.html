@@ -187,8 +187,8 @@ function render(data) {
     }
 
     const chips = [];
-    if (person.isBreederText) chips.push({ label: person.isBreederText === 'Yes' ? 'Breeder' : 'Non-breeder', blue: person.isBreederText === 'Yes' });
-    if (person.aliveText)     chips.push({ label: person.aliveText, blue: false });
+    if (person.isBreeder != null) chips.push({ label: person.isBreeder ? 'Breeder' : 'Non-breeder', blue: !!person.isBreeder });
+    if (person.alive && person.alive !== 'Unknown') chips.push({ label: person.alive, blue: false });
     if (person.roleText)      chips.push({ label: person.roleText, blue: false });
     if (person.publishContactInfo == 0) chips.push({ label: 'Contact private', blue: false });
 

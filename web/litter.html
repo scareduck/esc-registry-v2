@@ -309,13 +309,13 @@ function render(data) {
                     ${pupRow('Owner',       p.ownerId
                         ? `<a href="person.html?id=${p.ownerId}">${esc(p.ownerName||'(unnamed)')}</a>`
                         : '—')}
-                    ${pupRow('Tail',        p.tailText || '—')}
+                    ${pupRow('Tail',        (p.tailText && p.tailText !== 'Unknown') ? p.tailText : '—')}
                     ${pupRow('Beneficiary', p.beneficiaryId
                         ? `<a href="person.html?id=${p.beneficiaryId}">${esc(p.beneficiaryName||'(unnamed)')}</a>`
                         : '—')}
-                    ${pupRow('Rear dewclaws', p.rearDewClawsText || '—')}
+                    ${pupRow('Rear dewclaws', p.rearDewClaws ? 'Yes' : 'No')}
                     ${pupRow('Microchip',   chip || '—')}
-                    ${pupRow('Blue eyes',   p.blueEyesText || '—')}
+                    ${pupRow('Blue eyes',   p.blueEyes ? 'Yes' : 'No')}
                     ${pupRow('Tattoo',      p.tattooNumber || '—')}
                     ${dual ? pupRow('Sire', p.sireId
                         ? `<a href="dog.html?id=${p.sireId}">${esc(breedings.find(br=>br.id===p.breedingId)?.sireName||'(unnamed)')}</a>`
@@ -331,10 +331,10 @@ function render(data) {
 
     // ── Optional Health Questionnaire ─────────────────────────────────
     const qRows = [];
-    if (litter.naturalWhelpingText)    qRows.push(['Natural whelping',              litter.naturalWhelpingText]);
-    if (litter.plannedCaesarianText)   qRows.push(['Planned caesarian',             litter.plannedCaesarianText]);
-    if (litter.emergencyCaesarianText) qRows.push(['Emergency caesarian',           litter.emergencyCaesarianText]);
-    if (litter.oxytocinText)           qRows.push(['Oxytocin/Pitocin before last whelp', litter.oxytocinText]);
+    if (litter.natural_whelping)    qRows.push(['Natural whelping',                   'Yes']);
+    if (litter.planned_caesarian)   qRows.push(['Planned caesarian',                  'Yes']);
+    if (litter.emergency_caesarian) qRows.push(['Emergency caesarian',                'Yes']);
+    if (litter.oxytocinPitocin)     qRows.push(['Oxytocin/Pitocin before last whelp', 'Yes']);
 
     const deaths = [];
     if (litter.numberDiedNaturalCauses)  deaths.push([`Died of natural causes (${litter.numberDiedNaturalCauses})`, litter.descriptionDiedNaturalCauses]);

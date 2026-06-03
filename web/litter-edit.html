@@ -381,7 +381,7 @@ function render() {
                 </div>
                 <div class="form-group" style="flex:1">
                     <label class="form-label">Breeding Method</label>
-                    <select class="form-select" id="breeding-method">${opts(_lookups.breedingMethods, b.breedingMethodCode)}</select>
+                    <select class="form-select" id="breeding-method">${opts(_lookups.breedingMethods, b.breedingMethod)}</select>
                 </div>
             </div>
             <div class="form-row">
@@ -461,22 +461,22 @@ function render() {
     html += `<div class="card">
         <div class="card-head">Optional Health Questionnaire</div>
         <div class="card-body">
-            <div class="form-row">
-                <div class="form-group" style="flex:1">
+            <div class="form-row" style="gap:32px">
+                <div class="form-group">
                     <label class="form-label">Natural whelping</label>
-                    <select class="form-select" id="q-natural">${opts(_lookups.yesNo, l.naturalWhelpingCode)}</select>
+                    <label class="check-label"><input type="checkbox" id="q-natural" ${l.natural_whelping ? 'checked' : ''}> Yes</label>
                 </div>
-                <div class="form-group" style="flex:1">
+                <div class="form-group">
                     <label class="form-label">Planned Caesarian</label>
-                    <select class="form-select" id="q-planned-c">${opts(_lookups.yesNo, l.plannedCaesarianCode)}</select>
+                    <label class="check-label"><input type="checkbox" id="q-planned-c" ${l.planned_caesarian ? 'checked' : ''}> Yes</label>
                 </div>
-                <div class="form-group" style="flex:1">
+                <div class="form-group">
                     <label class="form-label">Emergency Caesarian</label>
-                    <select class="form-select" id="q-emerg-c">${opts(_lookups.yesNo, l.emergencyCaesarianCode)}</select>
+                    <label class="check-label"><input type="checkbox" id="q-emerg-c" ${l.emergency_caesarian ? 'checked' : ''}> Yes</label>
                 </div>
-                <div class="form-group" style="flex:1">
+                <div class="form-group">
                     <label class="form-label">Oxytocin/Pitocin</label>
-                    <select class="form-select" id="q-oxytocin">${opts(_lookups.yesNo, l.oxytocinCode)}</select>
+                    <label class="check-label"><input type="checkbox" id="q-oxytocin" ${l.oxytocinPitocin ? 'checked' : ''}> Yes</label>
                 </div>
             </div>
             <div class="section-rule">Perinatal Mortality &amp; Morbidity</div>
@@ -590,7 +590,7 @@ function pupCardHtml(p, displayPos) {
             <div class="form-row">
                 <div class="form-group" style="flex:1">
                     <label class="form-label">Sex</label>
-                    <select class="form-select" data-f="sexCode">${opts(_lookups.sexes, p.sexCode)}</select>
+                    <select class="form-select" data-f="sex">${opts(_lookups.sexes, p.sex)}</select>
                 </div>
                 <div class="form-group" style="flex:2">
                     <label class="form-label">Color</label>
@@ -598,15 +598,15 @@ function pupCardHtml(p, displayPos) {
                 </div>
                 <div class="form-group" style="flex:1">
                     <label class="form-label">Tail</label>
-                    <select class="form-select" data-f="tailCode">${opts(_lookups.tails, p.tailCode)}</select>
+                    <select class="form-select" data-f="tail">${opts(_lookups.tails, p.tailText)}</select>
                 </div>
                 <div class="form-group" style="flex:1">
                     <label class="form-label">Rear Dewclaws</label>
-                    <select class="form-select" data-f="rearDewClawsCode">${opts(_lookups.yesNo, p.rearDewClawsCode)}</select>
+                    <select class="form-select" data-f="rearDewClaws">${boolOpts(p.rearDewClaws)}</select>
                 </div>
                 <div class="form-group" style="flex:1">
                     <label class="form-label">Blue Eyes</label>
-                    <select class="form-select" data-f="blueEyesCode">${opts(_lookups.yesNo, p.blueEyesCode)}</select>
+                    <select class="form-select" data-f="blueEyes">${boolOpts(p.blueEyes)}</select>
                 </div>
             </div>
             <div class="form-row">
@@ -645,8 +645,8 @@ function addPup() {
     const newPup = {
         id: 0, _new: true, _idx: idx, breedingId,
         registrationNumber: null, name: '', callNames: '',
-        sexCode: null, coatColorCode: null, tailCode: null,
-        rearDewClawsCode: null, blueEyesCode: null,
+        sex: null, coatColorCode: null, tailText: null,
+        rearDewClaws: 0, blueEyes: 0,
         microchipNumber: '', microchipTypeCode: null, tattooNumber: '',
         ownerId: null, ownerName: null, beneficiaryId: null, beneficiaryName: null,
     };
@@ -691,11 +691,11 @@ function collectPups() {
             puppyLetter:      String.fromCharCode(65 + displayOrder),
             name:             gf('name'),
             callNames:        gf('callNames'),
-            sexCode:          gf('sexCode'),
+            sex:              gf('sex'),
             coatColorCode:    gf('coatColorCode'),
-            tailCode:         gf('tailCode'),
-            rearDewClawsCode: gf('rearDewClawsCode'),
-            blueEyesCode:     gf('blueEyesCode'),
+            tail:             gf('tail'),
+            rearDewClaws:     gf('rearDewClaws'),
+            blueEyes:         gf('blueEyes'),
             microchipNumber:  gf('microchipNumber'),
             microchipTypeCode:gf('microchipTypeCode'),
             tattooNumber:     gf('tattooNumber'),
@@ -726,10 +726,10 @@ async function save() {
         numberOfFemalesStillborn: nv('nfs'),
         numberOfMalesSurviving:   nv('nmv'),
         numberOfFemalesSurviving: nv('nfv'),
-        naturalWhelpingCode:    v('q-natural'),
-        plannedCaesarianCode:   v('q-planned-c'),
-        emergencyCaesarianCode: v('q-emerg-c'),
-        oxytocinCode:           v('q-oxytocin'),
+        natural_whelping:    document.getElementById('q-natural').checked   ? 1 : 0,
+        planned_caesarian:   document.getElementById('q-planned-c').checked ? 1 : 0,
+        emergency_caesarian: document.getElementById('q-emerg-c').checked   ? 1 : 0,
+        oxytocinPitocin:     document.getElementById('q-oxytocin').checked  ? 1 : 0,
         numberDiedNaturalCauses:      nv('ndnc'),
         descriptionDiedNaturalCauses: v('ddnc'),
         numberDiedAccidently:         nv('nda'),
@@ -746,7 +746,7 @@ async function save() {
             dateOfBreeding:             v('date-of-breeding'),
             breedingCity:               v('breeding-city'),
             breedingStateCode:          v('breeding-state'),
-            breedingMethodCode:         v('breeding-method'),
+            breedingMethod:             v('breeding-method'),
             damOwnerWitnessedBreeding:  document.getElementById('dam-witnessed').checked  ? 1 : 0,
             sireOwnerWitnessedBreeding: document.getElementById('sire-witnessed').checked ? 1 : 0,
             descriptionOfMating:        v('mating-desc'),
@@ -791,6 +791,12 @@ function opts(items, current) {
         html += `<option value="${esc(String(it.code))}"${sel}>${esc(it.text)}</option>`;
     }
     return html;
+}
+
+function boolOpts(current) {
+    return [['', '—'], ['0', 'No'], ['1', 'Yes']]
+        .map(([v, t]) => `<option value="${v}"${String(current) === v ? ' selected' : ''}>${t}</option>`)
+        .join('');
 }
 
 function cg(label, id, val) {
