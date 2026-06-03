@@ -808,7 +808,7 @@ function cg(label, id, val) {
 
 function isoDate(s) {
     if (!s) return null;
-    const d = s.split('T')[0];
+    const d = s.split('T')[0].split(' ')[0];
     return (d && d !== '0000-00-00') ? d : null;
 }
 

@@ -477,7 +477,7 @@ function groupByLitter(pups) {
 
 function fmtDate(s) {
     if (!s) return null;
-    const d = s.split('T')[0];
+    const d = s.split('T')[0].split(' ')[0];
     if (!d || d === '0000-00-00') return null;
     const [y, m, day] = d.split('-');
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
