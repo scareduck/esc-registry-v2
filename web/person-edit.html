@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edit Person — ESCR Registry Explorer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  background: #f1f3f4;
+  color: #202124;
+  min-height: 100vh;
+}
+
+header {
+  background: #1a73e8;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header a { color: #fff; text-decoration: none; font-size: 13px; opacity: 0.85; }
+header a:hover { opacity: 1; text-decoration: underline; }
+header h1 { font-size: 18px; font-weight: 600; }
+
+main { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+
+.card {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: visible;
+}
+.card-head {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  color: #5f6368; padding: 12px 20px; border-bottom: 1px solid #f1f3f4; background: #f8f9fa;
+  border-radius: 10px 10px 0 0;
+}
+.card-body { padding: 16px 20px; }
+.registrar-banner { background: #fff8e1; border-left: 4px solid #fbc02d; }
+
+.form-label {
+  display: block; font-size: 11px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: #5f6368; margin-bottom: 4px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%; padding: 7px 10px; font-size: 13px; font-family: inherit;
+  border: 1px solid #dadce0; border-radius: 6px; background: #fff; color: #202124;
+  transition: border-color .15s;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none; border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,.15);
+}
+.form-input[readonly] { background: #f8f9fa; color: #5f6368; cursor: default; }
+.form-textarea { resize: vertical; min-height: 60px; }
+.form-select { cursor: pointer; }
+.form-group { min-width: 0; }
+.form-row { display: flex; gap: 12px; margin-bottom: 10px; }
+.form-row:last-child { margin-bottom: 0; }
+.check-label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; padding: 4px 0; }
+.check-label input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+
+.section-rule {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: #80868b; margin: 16px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #f1f3f4;
+}
+
+/* Typeahead */
+.ta-wrap { position: relative; }
+.ta-row  { display: flex; gap: 4px; }
+.ta-input { flex: 1; min-width: 0; }
+.ta-clear {
+  flex: 0 0 auto; padding: 7px 9px; background: #f1f3f4; border: 1px solid #dadce0;
+  border-radius: 6px; cursor: pointer; font-size: 13px; color: #5f6368; line-height: 1;
+}
+.ta-clear:hover { background: #e8eaed; color: #202124; }
+.ta-drop {
+  position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 50;
+  background: #fff; border: 1px solid #dadce0; border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.13); max-height: 220px; overflow-y: auto;
+}
+.ta-item { padding: 8px 12px; cursor: pointer; font-size: 13px; display: flex; gap: 6px; align-items: baseline; }
+.ta-item:hover, .ta-item.ta-active { background: #e8f0fe; }
+.ta-item-label { font-weight: 500; }
+.ta-item-sub   { font-size: 12px; color: #5f6368; }
+
+/* Contact table */
+.contact-table { width: 100%; border-collapse: collapse; }
+.contact-table td { padding: 5px 0; vertical-align: middle; }
+.contact-table td:first-child { width: 120px; font-size: 12px; color: #5f6368; padding-right: 12px; white-space: nowrap; }
+.contact-table td + td { padding-right: 8px; }
+
+/* Buttons */
+.btn-primary {
+  background: #1a73e8; color: #fff; border: none; border-radius: 6px;
+  padding: 8px 18px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
+}
+.btn-primary:hover:not(:disabled) { background: #1557b0; }
+.btn-primary:disabled { background: #a8c7fa; cursor: not-allowed; }
+.btn-ghost {
+  background: none; border: 1px solid #dadce0; border-radius: 6px; color: #202124;
+  padding: 8px 16px; font-size: 13px; cursor: pointer; text-decoration: none;
+  display: inline-block; font-family: inherit;
+}
+.btn-ghost:hover { background: #f1f3f4; }
+
+.action-bar {
+  display: flex; align-items: center; justify-content: space-between; padding: 8px 0;
+}
+.save-status { font-size: 13px; font-weight: 500; }
+.loading   { text-align: center; padding: 60px 20px; color: #80868b; }
+.error-box { text-align: center; padding: 60px 20px; color: #5f6368; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html">← Search</a>
+  <h1 id="page-title">Edit Person</h1>
+</header>
+
+<main id="main">
+  <div class="loading">Loading…</div>
+</main>
+
+<script>
+"use strict";
+
+const params   = new URLSearchParams(location.search);
+let personId   = parseInt(params.get('id') || '0', 10);
+const _ta = {};
+let _lookups  = {};
+let _person   = null;
+let _phones   = [];
+let _emails   = [];
+let _addresses = [];
+
+/* ── Typeahead ─────────────────────────────────────────────────────────── */
+class Typeahead {
+    constructor(el, searchFn) {
+        this._el = el; this._searchFn = searchFn;
+        this._id = null; this._items = []; this._active = -1;
+        this._build();
+    }
+    _build() {
+        this._el.innerHTML =
+            `<div class="ta-row">
+                <input class="form-input ta-input" autocomplete="off" spellcheck="false" placeholder="Type to search…">
+                <button class="ta-clear" type="button" hidden>✕</button>
+            </div>
+            <div class="ta-drop" hidden></div>`;
+        this._inp  = this._el.querySelector('.ta-input');
+        this._drop = this._el.querySelector('.ta-drop');
+        this._clr  = this._el.querySelector('.ta-clear');
+        let timer;
+        this._inp.addEventListener('input', () => {
+            this._id = null;
+            this._clr.hidden = !this._inp.value;
+            clearTimeout(timer);
+            const q = this._inp.value.trim();
+            if (q.length < 2) { this._drop.hidden = true; return; }
+            timer = setTimeout(() => this._search(q), 200);
+        });
+        this._clr.addEventListener('click', () => {
+            this._id = null; this._inp.value = ''; this._drop.hidden = true;
+            this._clr.hidden = true; this._inp.focus();
+        });
+        this._inp.addEventListener('keydown', e => {
+            if (this._drop.hidden) return;
+            const n = this._items.length;
+            if (e.key === 'ArrowDown') { this._active = Math.min(this._active + 1, n - 1); this._hi(); e.preventDefault(); }
+            if (e.key === 'ArrowUp')   { this._active = Math.max(this._active - 1, 0);     this._hi(); e.preventDefault(); }
+            if (e.key === 'Enter' && this._active >= 0) { this._pick(this._active); e.preventDefault(); }
+            if (e.key === 'Escape') this._drop.hidden = true;
+        });
+        document.addEventListener('click', e => { if (!this._el.contains(e.target)) this._drop.hidden = true; });
+    }
+    async _search(q) {
+        this._items = await this._searchFn(q);
+        this._active = -1;
+        if (!this._items.length) { this._drop.hidden = true; return; }
+        this._drop.innerHTML = this._items.map((it, i) =>
+            `<div class="ta-item" data-i="${i}">
+                <span class="ta-item-label">${esc(it.label)}</span>
+                ${it.sub ? `<span class="ta-item-sub">${esc(it.sub)}</span>` : ''}
+            </div>`
+        ).join('');
+        this._drop.hidden = false;
+        this._drop.querySelectorAll('.ta-item').forEach(el =>
+            el.addEventListener('mousedown', e => { e.preventDefault(); this._pick(+el.dataset.i); }));
+    }
+    _pick(i) {
+        const it = this._items[i];
+        this._id = it.id; this._inp.value = it.label;
+        this._clr.hidden = false; this._drop.hidden = true;
+    }
+    _hi() {
+        this._drop.querySelectorAll('.ta-item').forEach((el, i) =>
+            el.classList.toggle('ta-active', i === this._active));
+    }
+    set(id, name) { this._id = id || null; this._inp.value = name || ''; this._clr.hidden = !name; }
+    get id()   { return this._id; }
+}
+
+async function kennelSearch(q) {
+    try {
+        const r = await fetch(`api.php?type=search&q=${encodeURIComponent(q)}&limit=8`).then(r => r.json());
+        return (r.kennels || []).map(k => ({
+            id: k.id,
+            label: k.name || '(unnamed)',
+            sub: k.primaryPerson || '',
+        }));
+    } catch { return []; }
+}
+
+/* ── Boot ──────────────────────────────────────────────────────────────── */
+if (!personId) {
+    fetch('api.php?type=lookups').then(r => r.json()).then(lookups => {
+        _lookups = lookups;
+        _person  = {};
+        render();
+    }).catch(() => {
+        document.getElementById('main').innerHTML = '<div class="error-box">Failed to load — check server connection.</div>';
+    });
+} else {
+    Promise.all([
+        fetch('api.php?type=person&id=' + personId).then(r => r.json()),
+        fetch('api.php?type=lookups').then(r => r.json()),
+    ]).then(([data, lookups]) => {
+        if (data.error) {
+            document.getElementById('main').innerHTML = `<div class="error-box">${esc(data.error)}</div>`;
+            return;
+        }
+        _lookups   = lookups;
+        _person    = data.person;
+        _phones    = data.phones    || [];
+        _emails    = data.emails    || [];
+        _addresses = data.addresses || [];
+        render();
+    }).catch(() => {
+        document.getElementById('main').innerHTML = '<div class="error-box">Failed to load — check server connection.</div>';
+    });
+}
+
+/* ── Render ────────────────────────────────────────────────────────────── */
+function render() {
+    const p = _person || {};
+    const fullName = [p.givenName, p.familyName].filter(Boolean).join(' ') || '(unnamed)';
+
+    document.title = personId ? ('Edit ' + fullName + ' — ESCR Registry Explorer') : 'New Person — ESCR Registry Explorer';
+    document.getElementById('page-title').textContent = personId ? ('Edit ' + fullName) : 'New Person';
+
+    let html = '';
+
+    // ── Identity ────────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Identity</div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">First Name</label>
+                    <input class="form-input" id="given-name" value="${esc(p.givenName || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Last Name</label>
+                    <input class="form-input" id="family-name" value="${esc(p.familyName || '')}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">ES Breeder</label>
+                    <select class="form-select" id="is-breeder">
+                        <option value="">—</option>
+                        <option value="1"${p.isBreeder == 1 ? ' selected' : ''}>Yes</option>
+                        <option value="0"${p.isBreeder == 0 && p.isBreeder !== null ? ' selected' : ''}>No</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Alive / Deceased</label>
+                    <select class="form-select" id="alive">
+                        ${['Unknown','Alive','Deceased'].map(v =>
+                            `<option value="${v}"${p.alive === v ? ' selected' : ''}>${v}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">ES Kennel</label>
+                    <div class="ta-wrap" id="ta-kennel"></div>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Username <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">(system)</span></label>
+                    <input class="form-input" value="${esc(p.username || '')}" readonly>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Membership / Role <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">(system)</span></label>
+                    <input class="form-input" value="${esc(p.roleText || 'not registered')}" readonly>
+                </div>
+                <div class="form-group" style="flex:1"></div>
+            </div>
+        </div>
+    </div>`;
+
+    // ── Comments ─────────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Comments</div>
+        <div class="card-body">
+            <div class="form-group" style="margin-bottom:10px">
+                <label class="form-label">Public Comments</label>
+                <textarea class="form-textarea" id="comments" rows="4">${esc(p.comments || '')}</textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Comments limited to Registrars only</label>
+                <textarea class="form-textarea" id="registrars-comments" rows="4">${esc(p.registrarsComments || '')}</textarea>
+            </div>
+        </div>
+    </div>`;
+
+    // ── Contact info ──────────────────────────────────────────────────────
+    const phoneByRole = {};
+    for (const ph of _phones) phoneByRole[ph.role] = ph;
+    const emailByRole = {};
+    for (const em of _emails) emailByRole[em.role] = em;
+
+    html += `<div class="card">
+        <div class="card-head">Contact Information</div>
+        <div class="card-body">
+            <div style="margin-bottom:14px">
+                <label class="check-label">
+                    <input type="checkbox" id="pub-contact"${p.publishContactInfo ? ' checked' : ''}>
+                    Share contact info — all registered users of the ESC Registry can see the contact info provided below
+                </label>
+                <div style="font-size:12px;color:#5f6368;margin-top:4px;margin-left:22px">
+                    *Even if unchecked, home city and home state are always visible.
+                </div>
+            </div>`;
+
+    if ((_lookups.telephoneRoles || []).length) {
+        html += `<div class="section-rule">Phone Numbers</div>
+            <table class="contact-table">`;
+        for (const role of _lookups.telephoneRoles) {
+            const existing = phoneByRole[role.text] || {};
+            html += `<tr>
+                <td>${esc(role.text)}</td>
+                <td><input class="form-input" data-phone-role="${role.code}" data-phone-field="number"
+                    value="${esc(existing.number || '')}" placeholder="Number"></td>
+                <td style="width:220px"><input class="form-input" data-phone-role="${role.code}" data-phone-field="note"
+                    value="${esc(existing.note || '')}" placeholder="Note"></td>
+            </tr>`;
+        }
+        html += `</table>`;
+    }
+
+    if ((_lookups.emailRoles || []).length) {
+        html += `<div class="section-rule">Email Addresses</div>
+            <table class="contact-table">`;
+        for (const role of _lookups.emailRoles) {
+            const existing = emailByRole[role.text] || {};
+            html += `<tr>
+                <td>${esc(role.text)}</td>
+                <td><input class="form-input" data-email-role="${role.code}" data-email-field="address"
+                    value="${esc(existing.emailAddress || '')}" placeholder="Email address"></td>
+                <td style="width:220px"><input class="form-input" data-email-role="${role.code}" data-email-field="note"
+                    value="${esc(existing.note || '')}" placeholder="Note"></td>
+            </tr>`;
+        }
+        html += `</table>`;
+    }
+
+    html += `</div></div>`;
+
+    // ── Addresses ─────────────────────────────────────────────────────────
+    if ((_lookups.addressRoles || []).length) {
+        const addrByRole = {};
+        for (const a of _addresses) addrByRole[a.role] = a;
+
+        html += `<div class="card">
+            <div class="card-head">Addresses</div>
+            <div class="card-body">`;
+
+        for (let i = 0; i < _lookups.addressRoles.length; i++) {
+            const role = _lookups.addressRoles[i];
+            const a    = addrByRole[role.text] || {};
+            const rid  = role.code;
+            if (i > 0) html += `<div style="margin-top:20px;padding-top:20px;border-top:1px solid #f1f3f4"></div>`;
+            html += `
+                <div class="section-rule">${esc(role.text)}</div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:2">
+                        <label class="form-label">Address Line 1</label>
+                        <input class="form-input" data-addr-role="${rid}" data-addr-field="s1" value="${esc(a.streetAddress1 || '')}">
+                    </div>
+                    <div class="form-group" style="flex:2">
+                        <label class="form-label">Address Line 2</label>
+                        <input class="form-input" data-addr-role="${rid}" data-addr-field="s2" value="${esc(a.streetAddress2 || '')}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:2">
+                        <label class="form-label">City</label>
+                        <input class="form-input" data-addr-role="${rid}" data-addr-field="city" value="${esc(a.city || '')}">
+                    </div>
+                    <div class="form-group" style="flex:2">
+                        <label class="form-label">State / Province</label>
+                        <select class="form-select" data-addr-role="${rid}" data-addr-field="state">
+                            ${opts(_lookups.states, a.state)}
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label class="form-label">ZIP / Postal Code</label>
+                        <input class="form-input" data-addr-role="${rid}" data-addr-field="zip" value="${esc(a.postalCode || '')}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1">
+                        <label class="form-label">Note</label>
+                        <input class="form-input" data-addr-role="${rid}" data-addr-field="note" value="${esc(a.note || '')}">
+                    </div>
+                </div>`;
+        }
+        html += `</div></div>`;
+    }
+
+    // ── Registrar notes ───────────────────────────────────────────────────
+    html += `<div class="card registrar-banner">
+        <div class="card-head">Registrar Notes <span style="font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">(internal)</span></div>
+        <div class="card-body">
+            <textarea class="form-textarea" id="reg-notes" rows="5">${esc(p.registrarsComments || '')}</textarea>
+        </div>
+    </div>`;
+
+    // ── Action bar ────────────────────────────────────────────────────────
+    html += `<div class="action-bar">
+        <a class="btn-ghost" id="cancel-btn" href="${personId ? 'person.html?id=' + personId : 'index.html'}">Cancel</a>
+        <div style="display:flex;gap:12px;align-items:center">
+            <span class="save-status" id="save-status"></span>
+            <button class="btn-primary" type="button" id="save-btn">${personId ? 'Save changes' : 'Create person'}</button>
+        </div>
+    </div>`;
+
+    document.getElementById('main').innerHTML = html;
+
+    // Init kennel typeahead
+    const kennelTA = new Typeahead(document.getElementById('ta-kennel'), kennelSearch);
+    if (p.kennelId) kennelTA.set(p.kennelId, p.kennelName || '');
+    _ta['kennel'] = kennelTA;
+
+    document.getElementById('save-btn').addEventListener('click', save);
+
+    // Sync registrar-comments field → reg-notes card (both map to same field)
+    const regNotesEl = document.getElementById('reg-notes');
+    const regCommentsEl = document.getElementById('registrars-comments');
+    if (regNotesEl && regCommentsEl) {
+        regCommentsEl.addEventListener('input', () => regNotesEl.value = regCommentsEl.value);
+        regNotesEl.addEventListener('input', () => regCommentsEl.value = regNotesEl.value);
+    }
+}
+
+/* ── Collect & Save ──────────────────────────────────────────────────── */
+async function save() {
+    const btn    = document.getElementById('save-btn');
+    const status = document.getElementById('save-status');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    status.textContent = ''; status.style.color = '';
+
+    // For new people: create the record first, then save details
+    if (!personId) {
+        const givenName  = document.getElementById('given-name')?.value?.trim()  || '';
+        const familyName = document.getElementById('family-name')?.value?.trim() || '';
+        if (!givenName && !familyName) {
+            status.textContent = 'Enter at least a first or last name.';
+            status.style.color = '#d93025';
+            btn.disabled = false; btn.textContent = 'Create person';
+            return;
+        }
+        try {
+            const cr = await fetch('api.php?type=person-create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({givenName, familyName}),
+            }).then(r => r.json());
+            if (!cr.ok) {
+                status.textContent = 'Error: ' + (cr.error || 'could not create person');
+                status.style.color = '#d93025';
+                btn.disabled = false; btn.textContent = 'Create person';
+                return;
+            }
+            personId = cr.id;
+            history.replaceState(null, '', 'person-edit.html?id=' + personId);
+            const name = [givenName, familyName].filter(Boolean).join(' ') || '(unnamed)';
+            document.getElementById('page-title').textContent = 'Edit ' + name;
+            document.getElementById('cancel-btn').href = 'person.html?id=' + personId;
+            btn.textContent = 'Save changes';
+        } catch {
+            status.textContent = 'Network error — not created';
+            status.style.color = '#d93025';
+            btn.disabled = false; btn.textContent = 'Create person';
+            return;
+        }
+    }
+
+    // Phones
+    const phones = (_lookups.telephoneRoles || []).map(role => ({
+        roleId: role.code,
+        number: document.querySelector(`[data-phone-role="${role.code}"][data-phone-field="number"]`)?.value || '',
+        note:   document.querySelector(`[data-phone-role="${role.code}"][data-phone-field="note"]`)?.value   || '',
+    }));
+
+    // Emails
+    const emails = (_lookups.emailRoles || []).map(role => ({
+        roleId:       role.code,
+        emailAddress: document.querySelector(`[data-email-role="${role.code}"][data-email-field="address"]`)?.value || '',
+        note:         document.querySelector(`[data-email-role="${role.code}"][data-email-field="note"]`)?.value    || '',
+    }));
+
+    // Addresses
+    const addresses = (_lookups.addressRoles || []).map(role => ({
+        roleId:         role.code,
+        streetAddress1: document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="s1"]`)?.value    || '',
+        streetAddress2: document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="s2"]`)?.value    || '',
+        city:           document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="city"]`)?.value  || '',
+        stateCode:      document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="state"]`)?.value || '',
+        postalCode:     document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="zip"]`)?.value   || '',
+        note:           document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="note"]`)?.value  || '',
+    }));
+
+    const payload = {
+        id:                  personId,
+        givenName:           document.getElementById('given-name')?.value        || '',
+        familyName:          document.getElementById('family-name')?.value       || '',
+        isBreeder:           document.getElementById('is-breeder')?.value        || null,
+        alive:               document.getElementById('alive')?.value             || 'Unknown',
+        kennelId:            _ta['kennel']?.id || null,
+        comments:            document.getElementById('comments')?.value          || '',
+        registrarsComments:  document.getElementById('registrars-comments')?.value || '',
+        publishContactInfo:  document.getElementById('pub-contact')?.checked ? 1 : 0,
+        phones,
+        emails,
+        addresses,
+    };
+
+    try {
+        const r = await fetch('api.php?type=person-save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        }).then(r => r.json());
+
+        if (r.ok) {
+            status.textContent = '✓ Saved';
+            status.style.color = '#137333';
+            setTimeout(() => { status.textContent = ''; }, 4000);
+        } else {
+            status.textContent = 'Error: ' + (r.error || 'save failed');
+            status.style.color = '#d93025';
+        }
+    } catch {
+        status.textContent = 'Network error — not saved';
+        status.style.color = '#d93025';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Save changes';
+}
+
+/* ── Helpers ─────────────────────────────────────────────────────────── */
+function opts(items, current) {
+    if (!items) return '';
+    let html = '<option value="">—</option>';
+    for (const it of items) {
+        const sel = String(it.code) === String(current) ? ' selected' : '';
+        html += `<option value="${esc(String(it.code))}"${sel}>${esc(it.text)}</option>`;
+    }
+    return html;
+}
+
+function esc(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>

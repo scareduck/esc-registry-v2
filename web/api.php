@@ -215,6 +215,8 @@ if ($type === 'dog') {
                d.predominant_white_markings AS whiteMarkingsText,
                mcr.registry_name      AS microchipRegistryText,
                mct.microchip_type_name AS microchipTypeText,
+               d.microchip_registry_id AS microchipRegistryId,
+               d.microchip_type_id     AS microchipTypeId,
                d.blue_eyes            AS blueEyes,
                d.rear_dew_claws       AS rearDewClaws,
                d.farm_or_ranch_dog    AS farmOrRanchDog,
@@ -272,7 +274,10 @@ if ($type === 'dog') {
                d.sire_comment         AS sireComment,
                d.dam_comment          AS damComment,
                d.littermates_comment  AS littermatesComment,
-               d.coat_color_id        AS coatColorCode
+               d.coat_color_id        AS coatColorCode,
+               d.descriptor           AS descriptor,
+               d.cause_of_death_id    AS causeOfDeathId,
+               d.breeding_id          AS breedingId
         FROM   dogs d
         LEFT JOIN coat_colors        cc  ON cc.coat_color_id      = d.coat_color_id
         LEFT JOIN microchip_registries mcr ON mcr.microchip_registry_id = d.microchip_registry_id
@@ -938,13 +943,28 @@ if ($type === 'lookups') {
         return $stmt->fetchAll();
     }
     echo json_encode([
-        'sexes'          => enumLookup($pdo, 'dogs', 'sex'),
-        'coatColors'     => fetchLookup($pdo, 'coat_colors', 'coat_color_id', 'coat_color_name'),
-        'tails'          => enumLookup($pdo, 'dogs', 'tail'),
-        'microchipTypes' => fetchLookup($pdo, 'microchip_types', 'microchip_type_id', 'microchip_type_name'),
-        'breedingMethods'=> enumLookup($pdo, 'breedings', 'breeding_method'),
-        'states'         => $pdo->query("SELECT state_code AS code, state_name AS text
-                                         FROM states ORDER BY state_name")->fetchAll(),
+        'sexes'              => enumLookup($pdo, 'dogs', 'sex'),
+        'coatColors'         => fetchLookup($pdo, 'coat_colors', 'coat_color_id', 'coat_color_name'),
+        'tails'              => enumLookup($pdo, 'dogs', 'tail'),
+        'microchipTypes'     => fetchLookup($pdo, 'microchip_types', 'microchip_type_id', 'microchip_type_name'),
+        'microchipRegistries'=> fetchLookup($pdo, 'microchip_registries', 'microchip_registry_id', 'registry_name'),
+        'breedingMethods'    => enumLookup($pdo, 'breedings', 'breeding_method'),
+        'states'             => $pdo->query("SELECT state_code AS code, state_name AS text
+                                             FROM states ORDER BY state_name")->fetchAll(),
+        'registrationTypes'  => enumLookup($pdo, 'dogs', 'registration_type'),
+        'whiteMarkings'      => enumLookup($pdo, 'dogs', 'predominant_white_markings'),
+        'spayStatus'         => enumLookup($pdo, 'dogs', 'spay_neuter_intact'),
+        'cerfResults'        => enumLookup($pdo, 'dogs', 'cerf_result'),
+        'mdr1Results'        => enumLookup($pdo, 'dogs', 'mdr1_result'),
+        'ofaHipsResults'     => enumLookup($pdo, 'dogs', 'ofa_hips_result'),
+        'ofaElbowsResults'   => enumLookup($pdo, 'dogs', 'ofa_elbows_result'),
+        'occupations'        => fetchLookup($pdo, 'occupations', 'occupation_id', 'occupation_name'),
+        'healthProblems'     => fetchLookup($pdo, 'health_problems', 'health_problem_id', 'health_problem_name'),
+        'otherMarkings'      => fetchLookup($pdo, 'other_markings', 'marking_id', 'marking_name'),
+        'causesOfDeath'      => fetchLookup($pdo, 'causes_of_death', 'cause_of_death_id', 'cause_name'),
+        'telephoneRoles'     => fetchLookup($pdo, 'telephone_number_roles', 'telephone_number_role_id', 'role_name'),
+        'emailRoles'         => fetchLookup($pdo, 'email_address_roles', 'email_address_role_id', 'role_name'),
+        'addressRoles'       => fetchLookup($pdo, 'postal_address_roles', 'postal_address_role_id', 'role_name'),
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -1126,6 +1146,444 @@ if ($type === 'litter-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 )->execute($pupParams + [':breeding' => $breedId]);
             }
             $displayOrder++;
+        }
+
+        $pdo->commit();
+        echo json_encode(['ok' => true, 'id' => $id]);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// ── Person create ────────────────────────────────────────────────────
+if ($type === 'person-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body = json_decode(file_get_contents('php://input'), true);
+    $givenName  = trim($body['givenName']  ?? '');
+    $familyName = trim($body['familyName'] ?? '');
+    if ($givenName === '' && $familyName === '') {
+        http_response_code(400);
+        echo json_encode(['error' => 'First name or last name is required']);
+        exit;
+    }
+    try {
+        $pdo->prepare("INSERT INTO people (given_name, family_name) VALUES (:g, :f)")
+            ->execute([':g' => $givenName, ':f' => $familyName]);
+        echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId()]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// ── Person save ──────────────────────────────────────────────────────
+if ($type === 'person-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body = json_decode(file_get_contents('php://input'), true);
+    if (!$body) { http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit; }
+    $id = (int)($body['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'missing id']); exit; }
+
+    $check = $pdo->prepare("SELECT person_id FROM people WHERE person_id = :id");
+    $check->execute([':id' => $id]);
+    if (!$check->fetch()) { http_response_code(404); echo json_encode(['error' => 'person not found']); exit; }
+
+    $nv  = fn($v) => $v ?? '';
+    $nvi = fn($v) => ($v === '' || $v === null || $v === 0 || $v === '0') ? null : (int)$v;
+    $bv  = fn($v) => ($v && $v !== '0') ? 1 : 0;
+
+    try {
+        $pdo->beginTransaction();
+
+        $pdo->prepare("UPDATE people SET
+            given_name           = :g,
+            family_name          = :f,
+            is_breeder           = :breeder,
+            kennel_id            = :kennel,
+            alive                = :alive,
+            comments             = :comments,
+            registrars_comments  = :regComments,
+            publish_contact_info = :pub
+            WHERE person_id = :id")->execute([
+            ':g'          => $nv($body['givenName']),
+            ':f'          => $nv($body['familyName']),
+            ':breeder'    => $nvi($body['isBreeder']) ?? 0,
+            ':kennel'     => $nvi($body['kennelId']),
+            ':alive'      => $body['alive'] ?? 'Unknown',
+            ':comments'   => $nv($body['comments']),
+            ':regComments'=> $nv($body['registrarsComments']),
+            ':pub'        => $bv($body['publishContactInfo']),
+            ':id'         => $id,
+        ]);
+
+        // Phones: delete all, re-insert non-empty
+        $pdo->prepare("DELETE FROM telephone_numbers WHERE person_id = :id")->execute([':id' => $id]);
+        foreach (($body['phones'] ?? []) as $ph) {
+            if (trim($ph['number'] ?? '') !== '') {
+                $pdo->prepare("INSERT INTO telephone_numbers (person_id, telephone_number_role_id, number, note)
+                    VALUES (:pid, :rid, :num, :note)")->execute([
+                    ':pid'  => $id,
+                    ':rid'  => $nvi($ph['roleId']),
+                    ':num'  => trim($ph['number']),
+                    ':note' => $nv($ph['note']),
+                ]);
+            }
+        }
+
+        // Emails: delete all, re-insert non-empty
+        $pdo->prepare("DELETE FROM email_addresses WHERE person_id = :id")->execute([':id' => $id]);
+        foreach (($body['emails'] ?? []) as $em) {
+            if (trim($em['emailAddress'] ?? '') !== '') {
+                $pdo->prepare("INSERT INTO email_addresses (person_id, email_address_role_id, email_address, note)
+                    VALUES (:pid, :rid, :addr, :note)")->execute([
+                    ':pid'  => $id,
+                    ':rid'  => $nvi($em['roleId']),
+                    ':addr' => trim($em['emailAddress']),
+                    ':note' => $nv($em['note']),
+                ]);
+            }
+        }
+
+        // Addresses: delete all, re-insert non-empty
+        $pdo->prepare("DELETE FROM postal_addresses WHERE person_id = :id")->execute([':id' => $id]);
+        foreach (($body['addresses'] ?? []) as $addr) {
+            if (trim($addr['streetAddress1'] ?? '') !== '' || trim($addr['city'] ?? '') !== '') {
+                $pdo->prepare("INSERT INTO postal_addresses
+                    (person_id, postal_address_role_id, street_address1, street_address2,
+                     city, state_code, country_code, postal_code, note)
+                    VALUES (:pid, :rid, :s1, :s2, :city, :state, :country, :zip, :note)")->execute([
+                    ':pid'     => $id,
+                    ':rid'     => $nvi($addr['roleId']),
+                    ':s1'      => $nv($addr['streetAddress1']),
+                    ':s2'      => $nv($addr['streetAddress2']),
+                    ':city'    => $nv($addr['city']),
+                    ':state'   => ($addr['stateCode'] !== '' && $addr['stateCode'] !== null) ? $addr['stateCode'] : null,
+                    ':country' => ($addr['countryCode'] !== '' && $addr['countryCode'] !== null) ? $addr['countryCode'] : null,
+                    ':zip'     => $nv($addr['postalCode']),
+                    ':note'    => $nv($addr['note']),
+                ]);
+            }
+        }
+
+        $pdo->commit();
+        echo json_encode(['ok' => true, 'id' => $id]);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// ── Dog create ───────────────────────────────────────────────────────
+if ($type === 'dog-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body = json_decode(file_get_contents('php://input'), true);
+    $name = trim($body['dogName'] ?? '');
+    if ($name === '') {
+        http_response_code(400);
+        echo json_encode(['error' => 'Dog name is required']);
+        exit;
+    }
+    try {
+        $pdo->prepare("INSERT INTO dogs (dog_name) VALUES (:n)")->execute([':n' => $name]);
+        echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId()]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// ── Dog save ─────────────────────────────────────────────────────────
+if ($type === 'dog-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body = json_decode(file_get_contents('php://input'), true);
+    if (!$body) { http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit; }
+    $id = (int)($body['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'missing id']); exit; }
+
+    $check = $pdo->prepare("SELECT dog_id, breeding_id FROM dogs WHERE dog_id = :id");
+    $check->execute([':id' => $id]);
+    $dogRow = $check->fetch();
+    if (!$dogRow) { http_response_code(404); echo json_encode(['error' => 'dog not found']); exit; }
+
+    $nv  = fn($v) => $v ?? '';
+    $nvi = fn($v) => ($v === '' || $v === null || $v === 0 || $v === '0') ? null : (int)$v;
+    $bv  = fn($v) => ($v && $v !== '0') ? 1 : 0;
+    $nin = fn($v) => ($v === '' || $v === null) ? 0 : (int)$v;
+    $dtv = fn($v) => ($v && $v !== '' && $v !== '0000-00-00') ? $v : '0000-00-00 00:00:00';
+    // age_at_death: frontend sends {years, months}
+    $ageAtDeath = $nin($body['ageAtDeathYears'] ?? 0) * 12 + $nin($body['ageAtDeathMonths'] ?? 0);
+
+    try {
+        $pdo->beginTransaction();
+
+        $pdo->prepare("UPDATE dogs SET
+            dog_name                            = :name,
+            sex                                 = :sex,
+            descriptor                          = :descriptor,
+            registration_type                   = :regType,
+            registration_type_comment           = :regTypeComment,
+            call_names                          = :callNames,
+            call_names_comment                  = :callNamesComment,
+            name_comment                        = :nameComment,
+            coat_color_id                       = :coatColor,
+            predominant_white_markings          = :whiteMarkings,
+            tail                                = :tail,
+            adult_height                        = :height,
+            adult_height_age_months             = :heightAge,
+            adult_weight                        = :weight,
+            adult_weight_age_months             = :weightAge,
+            adult_weight_height_comment         = :heightWeightComment,
+            spay_neuter_intact                  = :spayStatus,
+            spay_neuter_age_months              = :spayAge,
+            other_health_information            = :otherHealth,
+            other_health_information_comment    = :otherHealthComment,
+            age_at_death_months                 = :ageAtDeath,
+            age_at_death_comment                = :ageAtDeathComment,
+            cause_of_death_id                   = :causeOfDeath,
+            cause_of_death_comment              = :causeOfDeathComment,
+            other_cause_of_death                = :otherCause,
+            pennhip_di_left                     = :phDiL,
+            pennhip_di_right                    = :phDiR,
+            pennhip_djd_left                    = :phDjdL,
+            pennhip_djd_right                   = :phDjdR,
+            pennhip_cavitation_left             = :phCavL,
+            pennhip_cavitation_right            = :phCavR,
+            pennhip_age_months                  = :phAge,
+            ofa_hips_result                     = :ofaHips,
+            ofa_hips_age_months                 = :ofaHipsAge,
+            gdc_hips_result                     = :gdcHips,
+            gdc_hips_age_months                 = :gdcHipsAge,
+            other_radiographic_hips_result      = :otherHips,
+            other_radiographic_hips_comment     = :otherHipsComment,
+            other_radiographic_hips_age_months  = :otherHipsAge,
+            ofa_elbows_result                   = :ofaElbows,
+            ofa_elbows_age_months               = :ofaElbowsAge,
+            cerf_result                         = :cerf,
+            cerf_age_months                     = :cerfAge,
+            mdr1_result                         = :mdr1,
+            mdr1_age_months                     = :mdr1Age,
+            owners_description                  = :ownersDesc,
+            farm_or_ranch_dog                   = :farmRanch,
+            beef_cattle                         = :beefCattle,
+            dairy_cattle                        = :dairyCattle,
+            sheep                               = :sheep,
+            goats                               = :goats,
+            hogs                                = :hogs,
+            horses                              = :horses,
+            poultry                             = :poultry,
+            livestock_numbers_comment           = :livestockComment,
+            occupations_comment                 = :occupationsComment,
+            microchip_number                    = :chipNum,
+            microchip_registry_id               = :chipReg,
+            microchip_type_id                   = :chipType,
+            microchip_number_comment            = :chipComment,
+            tattoo_number                       = :tattoo,
+            tattoo_registry                     = :tattooReg,
+            tattoo_number_comment               = :tattooComment,
+            ukc_purple_ribbon                   = :ukcRibbon,
+            registrars_comment                  = :registrarsComment,
+            date_acquired                       = :dateAcquired,
+            owner_comment                       = :ownerComment,
+            previous_owner_comment              = :prevOwnerComment,
+            date_of_whelp_comment               = :dateOfWhelpComment,
+            breeder_comment                     = :breederComment,
+            owner_id                            = :owner,
+            previous_owner_id                   = :prevOwner,
+            beneficiary_id                      = :beneficiary,
+            registered_by_id                    = :registeredBy
+            WHERE dog_id = :id")->execute([
+            ':name'              => $nv($body['name']),
+            ':sex'               => $body['sex'] ?? 'Unknown',
+            ':descriptor'        => $nv($body['descriptor']),
+            ':regType'           => $body['registrationType'] ?? 'Unknown',
+            ':regTypeComment'    => $nv($body['registrationTypeComment']),
+            ':callNames'         => $nv($body['callNames']),
+            ':callNamesComment'  => $nv($body['callNamesComment']),
+            ':nameComment'       => $nv($body['nameComment']),
+            ':coatColor'         => $nvi($body['coatColorCode']),
+            ':whiteMarkings'     => $body['whiteMarkings'] ?? 'Unknown',
+            ':tail'              => $body['tail'] ?? 'Unknown',
+            ':height'            => $nin($body['adultHeight']),
+            ':heightAge'         => $nin($body['adultHeightAgeMonths']),
+            ':weight'            => $nin($body['adultWeight']),
+            ':weightAge'         => $nin($body['adultWeightAgeMonths']),
+            ':heightWeightComment' => $nv($body['heightWeightComment']),
+            ':spayStatus'        => $body['spayStatus'] ?? 'Unknown',
+            ':spayAge'           => $nin($body['spayAgeMonths']),
+            ':otherHealth'       => $nv($body['otherHealthInfo']),
+            ':otherHealthComment'=> $nv($body['otherHealthComment']),
+            ':ageAtDeath'        => $ageAtDeath,
+            ':ageAtDeathComment' => $nv($body['ageAtDeathComment']),
+            ':causeOfDeath'      => $nvi($body['causeOfDeathId']),
+            ':causeOfDeathComment' => $nv($body['causeOfDeathComment']),
+            ':otherCause'        => $nv($body['otherCauseOfDeath']),
+            ':phDiL'             => $nv($body['pennhipDiLeft']),
+            ':phDiR'             => $nv($body['pennhipDiRight']),
+            ':phDjdL'            => $bv($body['pennhipDjdLeft']  ?? 0),
+            ':phDjdR'            => $bv($body['pennhipDjdRight'] ?? 0),
+            ':phCavL'            => $bv($body['pennhipCavLeft']  ?? 0),
+            ':phCavR'            => $bv($body['pennhipCavRight'] ?? 0),
+            ':phAge'             => $nin($body['pennhipAge']),
+            ':ofaHips'           => $body['ofaHipsResult']    ?? 'Unknown',
+            ':ofaHipsAge'        => $nin($body['ofaHipsAge']),
+            ':gdcHips'           => $nv($body['gdcHipsResult']),
+            ':gdcHipsAge'        => $nin($body['gdcHipsAge']),
+            ':otherHips'         => $nv($body['otherHipsResult']),
+            ':otherHipsComment'  => $nv($body['otherHipsComment']),
+            ':otherHipsAge'      => $nin($body['otherHipsAge']),
+            ':ofaElbows'         => $body['ofaElbowsResult']  ?? 'Unknown',
+            ':ofaElbowsAge'      => $nin($body['ofaElbowsAge']),
+            ':cerf'              => $body['cerfResult']       ?? 'Unknown',
+            ':cerfAge'           => $nin($body['cerfAge']),
+            ':mdr1'              => $body['mdr1Result']       ?? 'Unknown',
+            ':mdr1Age'           => $nin($body['mdr1Age']),
+            ':ownersDesc'        => $nv($body['ownersDescription']),
+            ':farmRanch'         => $bv($body['farmOrRanchDog'] ?? 0),
+            ':beefCattle'        => $nin($body['beefCattle']),
+            ':dairyCattle'       => $nin($body['dairyCattle']),
+            ':sheep'             => $nin($body['sheep']),
+            ':goats'             => $nin($body['goats']),
+            ':hogs'              => $nin($body['hogs']),
+            ':horses'            => $nin($body['horses']),
+            ':poultry'           => $nin($body['poultry']),
+            ':livestockComment'  => $nv($body['livestockComment']),
+            ':occupationsComment'=> $nv($body['occupationsComment']),
+            ':chipNum'           => $nv($body['microchipNumber']),
+            ':chipReg'           => $nvi($body['microchipRegistryId']),
+            ':chipType'          => $nvi($body['microchipTypeId']),
+            ':chipComment'       => $nv($body['microchipComment']),
+            ':tattoo'            => $nv($body['tattooNumber']),
+            ':tattooReg'         => $nv($body['tattooRegistry']),
+            ':tattooComment'     => $nv($body['tattooComment']),
+            ':ukcRibbon'         => $bv($body['ukcPurpleRibbon'] ?? 0),
+            ':registrarsComment' => $nv($body['registrarsComment']),
+            ':dateAcquired'      => $dtv($body['dateAcquired']  ?? ''),
+            ':ownerComment'      => $nv($body['ownerComment']),
+            ':prevOwnerComment'  => $nv($body['previousOwnerComment']),
+            ':dateOfWhelpComment'=> $nv($body['dateOfWhelpComment']),
+            ':breederComment'    => $nv($body['breederComment']),
+            ':owner'             => $nvi($body['ownerId']),
+            ':prevOwner'         => $nvi($body['previousOwnerId']),
+            ':beneficiary'       => $nvi($body['beneficiaryId']),
+            ':registeredBy'      => $nvi($body['registeredById']),
+            ':id'                => $id,
+        ]);
+
+        // Update breeding/litter parentage if dog has a breeding_id
+        $breedingId = (int)$dogRow['breeding_id'];
+        if ($breedingId) {
+            $pdo->prepare("UPDATE breedings SET sire_id = :sire WHERE breeding_id = :bid")
+                ->execute([':sire' => $nvi($body['sireId']), ':bid' => $breedingId]);
+            // Get the litter_id for this breeding
+            $litRow = $pdo->prepare("SELECT litter_id FROM breedings WHERE breeding_id = :bid");
+            $litRow->execute([':bid' => $breedingId]);
+            $litId = (int)($litRow->fetchColumn() ?: 0);
+            if ($litId) {
+                $pdo->prepare("UPDATE litters SET
+                    dam_id         = :dam,
+                    date_of_whelp  = :dob,
+                    breeder_id     = :breeder
+                    WHERE litter_id = :lid")->execute([
+                    ':dam'     => $nvi($body['damId']),
+                    ':dob'     => $dtv($body['dateOfWhelp'] ?? ''),
+                    ':breeder' => $nvi($body['breederId']),
+                    ':lid'     => $litId,
+                ]);
+            }
+        } elseif ($nvi($body['sireId']) || $nvi($body['damId'])) {
+            // Create new litter + breeding and link dog
+            $pdo->prepare("INSERT INTO litters (dam_id, date_of_whelp, breeder_id) VALUES (:dam, :dob, :breeder)")
+                ->execute([
+                    ':dam'     => $nvi($body['damId']),
+                    ':dob'     => $dtv($body['dateOfWhelp'] ?? ''),
+                    ':breeder' => $nvi($body['breederId']),
+                ]);
+            $newLitterId = (int)$pdo->lastInsertId();
+            $pdo->prepare("INSERT INTO breedings (litter_id, sire_id) VALUES (:lit, :sire)")
+                ->execute([':lit' => $newLitterId, ':sire' => $nvi($body['sireId'])]);
+            $newBreedingId = (int)$pdo->lastInsertId();
+            $pdo->prepare("UPDATE dogs SET breeding_id = :bid WHERE dog_id = :id")
+                ->execute([':bid' => $newBreedingId, ':id' => $id]);
+        }
+
+        // Junction tables: occupations
+        $pdo->prepare("DELETE FROM dog_occupations WHERE dog_id = :id")->execute([':id' => $id]);
+        foreach (($body['occupationIds'] ?? []) as $oid) {
+            if ($oid = (int)$oid) {
+                $pdo->prepare("INSERT IGNORE INTO dog_occupations (dog_id, occupation_id) VALUES (:d, :o)")
+                    ->execute([':d' => $id, ':o' => $oid]);
+            }
+        }
+
+        // Junction tables: health problems
+        $pdo->prepare("DELETE FROM dog_health_problems WHERE dog_id = :id")->execute([':id' => $id]);
+        foreach (($body['healthProblemIds'] ?? []) as $hid) {
+            if ($hid = (int)$hid) {
+                $pdo->prepare("INSERT IGNORE INTO dog_health_problems (dog_id, health_problem_id) VALUES (:d, :h)")
+                    ->execute([':d' => $id, ':h' => $hid]);
+            }
+        }
+
+        // Junction tables: other markings
+        $pdo->prepare("DELETE FROM dog_markings WHERE dog_id = :id")->execute([':id' => $id]);
+        foreach (($body['markingIds'] ?? []) as $mid) {
+            if ($mid = (int)$mid) {
+                $pdo->prepare("INSERT IGNORE INTO dog_markings (dog_id, marking_id) VALUES (:d, :m)")
+                    ->execute([':d' => $id, ':m' => $mid]);
+            }
+        }
+
+        // External registrations: delete + re-insert non-empty
+        $pdo->prepare("DELETE FROM external_registrations WHERE dog_id = :id")->execute([':id' => $id]);
+        foreach (($body['externalRegistrations'] ?? []) as $reg) {
+            $registry = $reg['registry'] ?? '';
+            $regNum   = trim($reg['registrationNumber'] ?? '');
+            $regName  = trim($reg['registeredName'] ?? '');
+            if ($registry !== '' && ($regNum !== '' || $regName !== '')) {
+                $pdo->prepare("INSERT INTO external_registrations (dog_id, registry, registration_number, registered_name, comment)
+                    VALUES (:d, :r, :n, :nm, :c)")->execute([
+                    ':d'  => $id,
+                    ':r'  => $registry,
+                    ':n'  => $regNum,
+                    ':nm' => $regName,
+                    ':c'  => $nv($reg['comment']),
+                ]);
+            }
+        }
+
+        // Titles: delete + re-insert non-empty
+        $pdo->prepare("DELETE FROM dog_titles WHERE dog_id = :id")->execute([':id' => $id]);
+        foreach (($body['titles'] ?? []) as $t) {
+            $disc   = $t['discipline'] ?? '';
+            $titles = trim($t['titles'] ?? '');
+            if ($disc !== '' && $titles !== '') {
+                $pdo->prepare("INSERT INTO dog_titles (dog_id, discipline, titles) VALUES (:d, :disc, :t)")
+                    ->execute([':d' => $id, ':disc' => $disc, ':t' => $titles]);
+            }
+        }
+
+        // Photo captions: upsert by index
+        foreach (($body['photoCaptions'] ?? []) as $pc) {
+            $idx     = (int)($pc['idx'] ?? 0);
+            $caption = trim($pc['caption'] ?? '');
+            // Check if row exists
+            $ex = $pdo->prepare("SELECT 1 FROM dog_photos WHERE dog_id = :d AND photo_index = :i");
+            $ex->execute([':d' => $id, ':i' => $idx]);
+            if ($ex->fetchColumn()) {
+                if ($caption === '') {
+                    $pdo->prepare("DELETE FROM dog_photos WHERE dog_id = :d AND photo_index = :i")
+                        ->execute([':d' => $id, ':i' => $idx]);
+                } else {
+                    $pdo->prepare("UPDATE dog_photos SET caption = :c WHERE dog_id = :d AND photo_index = :i")
+                        ->execute([':c' => $caption, ':d' => $id, ':i' => $idx]);
+                }
+            } elseif ($caption !== '') {
+                $pdo->prepare("INSERT INTO dog_photos (dog_id, photo_index, caption) VALUES (:d, :i, :c)")
+                    ->execute([':d' => $id, ':i' => $idx, ':c' => $caption]);
+            }
         }
 
         $pdo->commit();

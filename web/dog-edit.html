@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edit Dog — ESCR Registry Explorer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  background: #f1f3f4;
+  color: #202124;
+  min-height: 100vh;
+}
+
+header {
+  background: #1a73e8;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header a { color: #fff; text-decoration: none; font-size: 13px; opacity: 0.85; }
+header a:hover { opacity: 1; text-decoration: underline; }
+header h1 { font-size: 18px; font-weight: 600; }
+
+main { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
+
+.card {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: visible;
+}
+.card-head {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  color: #5f6368; padding: 12px 20px; border-bottom: 1px solid #f1f3f4; background: #f8f9fa;
+  border-radius: 10px 10px 0 0;
+}
+.card-body { padding: 16px 20px; }
+.registrar-banner { background: #fff8e1; border-left: 4px solid #fbc02d; }
+
+.form-label {
+  display: block; font-size: 11px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: #5f6368; margin-bottom: 4px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%; padding: 7px 10px; font-size: 13px; font-family: inherit;
+  border: 1px solid #dadce0; border-radius: 6px; background: #fff; color: #202124;
+  transition: border-color .15s;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none; border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,.15);
+}
+.form-input[readonly] { background: #f8f9fa; color: #5f6368; cursor: default; }
+.form-textarea { resize: vertical; min-height: 60px; }
+.form-select { cursor: pointer; }
+.form-group { min-width: 0; }
+.form-row { display: flex; gap: 12px; margin-bottom: 10px; }
+.form-row:last-child { margin-bottom: 0; }
+.check-label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; padding: 4px 0; }
+.check-label input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+
+.section-rule {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: #80868b; margin: 14px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #f1f3f4;
+}
+
+/* Typeahead */
+.ta-wrap { position: relative; }
+.ta-row  { display: flex; gap: 4px; }
+.ta-input { flex: 1; min-width: 0; }
+.ta-clear {
+  flex: 0 0 auto; padding: 7px 9px; background: #f1f3f4; border: 1px solid #dadce0;
+  border-radius: 6px; cursor: pointer; font-size: 13px; color: #5f6368; line-height: 1;
+}
+.ta-clear:hover { background: #e8eaed; color: #202124; }
+.ta-drop {
+  position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 50;
+  background: #fff; border: 1px solid #dadce0; border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.13); max-height: 220px; overflow-y: auto;
+}
+.ta-item { padding: 8px 12px; cursor: pointer; font-size: 13px; display: flex; gap: 6px; align-items: baseline; }
+.ta-item:hover, .ta-item.ta-active { background: #e8f0fe; }
+.ta-item-label { font-weight: 500; }
+.ta-item-sub   { font-size: 12px; color: #5f6368; }
+
+/* Checkboxes grid */
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 4px 16px;
+}
+
+/* External registrations table */
+.reg-table { width: 100%; border-collapse: collapse; }
+.reg-table th {
+  text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: #5f6368; padding: 0 8px 6px 0;
+}
+.reg-table td { padding: 5px 8px 5px 0; vertical-align: middle; }
+.reg-table td:first-child { width: 60px; font-size: 12px; font-weight: 600; color: #3c4043; }
+
+/* Health test rows */
+.test-row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 10px; }
+.test-row:last-child { margin-bottom: 0; }
+.test-label { font-size: 12px; color: #5f6368; width: 160px; flex-shrink: 0; padding-bottom: 8px; }
+
+/* Age at death inline */
+.age-row { display: flex; gap: 6px; align-items: center; }
+.age-row input { width: 60px; }
+.age-row span { font-size: 12px; color: #5f6368; }
+
+/* Buttons */
+.btn-primary {
+  background: #1a73e8; color: #fff; border: none; border-radius: 6px;
+  padding: 8px 18px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
+}
+.btn-primary:hover:not(:disabled) { background: #1557b0; }
+.btn-primary:disabled { background: #a8c7fa; cursor: not-allowed; }
+.btn-ghost {
+  background: none; border: 1px solid #dadce0; border-radius: 6px; color: #202124;
+  padding: 8px 16px; font-size: 13px; cursor: pointer; text-decoration: none;
+  display: inline-block; font-family: inherit;
+}
+.btn-ghost:hover { background: #f1f3f4; }
+
+.action-bar {
+  display: flex; align-items: center; justify-content: space-between; padding: 8px 0;
+}
+.save-status { font-size: 13px; font-weight: 500; }
+.litter-note { font-size: 12px; color: #5f6368; font-style: italic; margin-top: 4px; }
+.loading   { text-align: center; padding: 60px 20px; color: #80868b; }
+.error-box { text-align: center; padding: 60px 20px; color: #5f6368; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="index.html">← Search</a>
+  <h1 id="page-title">Edit Dog</h1>
+</header>
+
+<main id="main">
+  <div class="loading">Loading…</div>
+</main>
+
+<script>
+"use strict";
+
+const params = new URLSearchParams(location.search);
+let dogId    = parseInt(params.get('id') || '0', 10);
+const _ta    = {};
+let _lookups = {};
+let _dog     = null;
+let _detail  = null;
+let _extRegs = {};
+let _titles  = {};
+let _occupations  = [];
+let _healthProbs  = [];
+let _otherMarks   = [];
+let _photos       = [];
+
+/* ── Disciplines (display label → enum value) ───────────────────────── */
+const DISCIPLINES = [
+    {val: 'AWFA',             label: 'AWFA'},
+    {val: 'Herding',          label: 'Herding'},
+    {val: 'Service',          label: 'Service / Assistance'},
+    {val: 'SAR',              label: 'Search and Rescue / Detection'},
+    {val: 'Obedience',        label: 'Obedience'},
+    {val: 'Rally Obedience',  label: 'Rally Obedience'},
+    {val: 'Freestyle',        label: 'Freestyle'},
+    {val: 'Agility',          label: 'Agility'},
+    {val: 'Flyball',          label: 'Flyball'},
+    {val: 'Temperament',      label: 'Temperament Test'},
+    {val: 'Therapy',          label: 'Therapy Dog'},
+    {val: 'CGC/CGN',          label: 'CGC / CGN'},
+    {val: 'Protection',       label: 'Schutzhund / Protection'},
+    {val: 'Other',            label: 'Other'},
+];
+
+/* ── Typeahead ─────────────────────────────────────────────────────────── */
+class Typeahead {
+    constructor(el, searchFn) {
+        this._el = el; this._searchFn = searchFn;
+        this._id = null; this._items = []; this._active = -1;
+        this._build();
+    }
+    _build() {
+        this._el.innerHTML =
+            `<div class="ta-row">
+                <input class="form-input ta-input" autocomplete="off" spellcheck="false" placeholder="Type to search…">
+                <button class="ta-clear" type="button" hidden>✕</button>
+            </div>
+            <div class="ta-drop" hidden></div>`;
+        this._inp  = this._el.querySelector('.ta-input');
+        this._drop = this._el.querySelector('.ta-drop');
+        this._clr  = this._el.querySelector('.ta-clear');
+        let timer;
+        this._inp.addEventListener('input', () => {
+            this._id = null;
+            this._clr.hidden = !this._inp.value;
+            clearTimeout(timer);
+            const q = this._inp.value.trim();
+            if (q.length < 2) { this._drop.hidden = true; return; }
+            timer = setTimeout(() => this._search(q), 200);
+        });
+        this._clr.addEventListener('click', () => {
+            this._id = null; this._inp.value = ''; this._drop.hidden = true;
+            this._clr.hidden = true; this._inp.focus();
+        });
+        this._inp.addEventListener('keydown', e => {
+            if (this._drop.hidden) return;
+            const n = this._items.length;
+            if (e.key === 'ArrowDown') { this._active = Math.min(this._active + 1, n - 1); this._hi(); e.preventDefault(); }
+            if (e.key === 'ArrowUp')   { this._active = Math.max(this._active - 1, 0);     this._hi(); e.preventDefault(); }
+            if (e.key === 'Enter' && this._active >= 0) { this._pick(this._active); e.preventDefault(); }
+            if (e.key === 'Escape') this._drop.hidden = true;
+        });
+        document.addEventListener('click', e => { if (!this._el.contains(e.target)) this._drop.hidden = true; });
+    }
+    async _search(q) {
+        this._items = await this._searchFn(q);
+        this._active = -1;
+        if (!this._items.length) { this._drop.hidden = true; return; }
+        this._drop.innerHTML = this._items.map((it, i) =>
+            `<div class="ta-item" data-i="${i}">
+                <span class="ta-item-label">${esc(it.label)}</span>
+                ${it.sub ? `<span class="ta-item-sub">${esc(it.sub)}</span>` : ''}
+            </div>`
+        ).join('');
+        this._drop.hidden = false;
+        this._drop.querySelectorAll('.ta-item').forEach(el =>
+            el.addEventListener('mousedown', e => { e.preventDefault(); this._pick(+el.dataset.i); }));
+    }
+    _pick(i) {
+        const it = this._items[i];
+        this._id = it.id; this._inp.value = it.label;
+        this._clr.hidden = false; this._drop.hidden = true;
+    }
+    _hi() {
+        this._drop.querySelectorAll('.ta-item').forEach((el, i) =>
+            el.classList.toggle('ta-active', i === this._active));
+    }
+    set(id, name) { this._id = id || null; this._inp.value = name || ''; this._clr.hidden = !name; }
+    get id()   { return this._id; }
+}
+
+async function personSearch(q) {
+    try {
+        const r = await fetch(`api.php?type=search&q=${encodeURIComponent(q)}&limit=8`).then(r => r.json());
+        return (r.people || []).map(p => ({
+            id: p.id,
+            label: [p.givenName, p.familyName].filter(Boolean).join(' '),
+            sub: p.kennel || '',
+        }));
+    } catch { return []; }
+}
+
+async function dogSearch(q) {
+    try {
+        const r = await fetch(`api.php?type=search&q=${encodeURIComponent(q)}&limit=8`).then(r => r.json());
+        return (r.dogs || []).map(d => ({
+            id: d.id,
+            label: d.name || '(unnamed)',
+            sub: d.registrationNumber ? 'ESC-' + d.registrationNumber : '',
+        }));
+    } catch { return []; }
+}
+
+function dogLabel(name, reg) {
+    if (!name) return null;
+    return name + (reg ? ' · ESC-' + reg : '');
+}
+
+function initTA(key, searchFn, id, name) {
+    const el = document.getElementById('ta-' + key);
+    if (!el) return null;
+    const ta = new Typeahead(el, searchFn);
+    if (id || name) ta.set(id, name);
+    _ta[key] = ta;
+    return ta;
+}
+
+/* ── Boot ──────────────────────────────────────────────────────────────── */
+if (!dogId) {
+    fetch('api.php?type=lookups').then(r => r.json()).then(lookups => {
+        _lookups = lookups;
+        _dog     = {};
+        _detail  = {};
+        render();
+    }).catch(() => {
+        document.getElementById('main').innerHTML = '<div class="error-box">Failed to load — check server connection.</div>';
+    });
+} else {
+    Promise.all([
+        fetch('api.php?type=dog&id=' + dogId).then(r => r.json()),
+        fetch('api.php?type=lookups').then(r => r.json()),
+    ]).then(([data, lookups]) => {
+        if (data.error) {
+            document.getElementById('main').innerHTML = `<div class="error-box">${esc(data.error)}</div>`;
+            return;
+        }
+        _lookups      = lookups;
+        _dog          = data.dog;
+        _detail       = data.detail;
+        _extRegs      = data.externalRegistrations || {};
+        _titles       = data.titles || {};
+        _occupations  = data.occupations  || [];
+        _healthProbs  = data.healthProblems || [];
+        _otherMarks   = data.otherMarkings || [];
+        _photos       = data.photos || [];
+        render();
+    }).catch(() => {
+        document.getElementById('main').innerHTML = '<div class="error-box">Failed to load — check server connection.</div>';
+    });
+}
+
+/* ── Main render ───────────────────────────────────────────────────────── */
+function render() {
+    const d  = _dog   || {};
+    const dt = _detail || {};
+    const regCode = d.registrationNumber ? 'ESC-' + d.registrationNumber : '(unregistered)';
+
+    document.title = dogId ? ('Edit ' + (d.name || regCode) + ' — ESCR Registry Explorer') : 'New Dog — ESCR Registry Explorer';
+    document.getElementById('page-title').textContent = dogId ? ('Edit ' + (d.name || regCode)) : 'New Dog';
+
+    // Sets for junction table pre-checks
+    const occSet  = new Set(_occupations);
+    const hpSet   = new Set(_healthProbs);
+    const markSet = new Set(_otherMarks);
+
+    // Photo captions by index
+    const photoMap = {};
+    for (const ph of _photos) photoMap[ph.idx] = ph.caption;
+
+    // Months → {years, months}
+    const ageAtDeathMo = parseInt(dt.ageAtDeathInMonths || 0, 10);
+    const ageYears  = Math.floor(ageAtDeathMo / 12);
+    const ageMo     = ageAtDeathMo % 12;
+
+    let html = '';
+
+    // ── General Info ────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">General Information</div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:3">
+                    <label class="form-label">ESC Name <span style="color:#d93025">*</span></label>
+                    <input class="form-input" id="dog-name" value="${esc(d.name || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Sex <span style="color:#d93025">*</span></label>
+                    <select class="form-select" id="sex">${opts(_lookups.sexes, d.sex)}</select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Additional Description</label>
+                    <input class="form-input" id="descriptor" value="${esc(dt.descriptor || '')}">
+                </div>
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Call Names</label>
+                    <input class="form-input" id="call-names" value="${esc(dt.callNames || '')}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Registration Type</label>
+                    <select class="form-select" id="reg-type">${opts(_lookups.registrationTypes, d.registrationType)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">ESC Reg. Number <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">(system)</span></label>
+                    <input class="form-input" value="${esc(regCode)}" readonly>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Date Registered <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">(system)</span></label>
+                    <input class="form-input" value="${esc(isoDate(d.dateRegistered) || '—')}" readonly>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Name note</label>
+                    <input class="form-input" id="name-comment" value="${esc(dt.nameComment || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Call names note</label>
+                    <input class="form-input" id="call-names-comment" value="${esc(dt.callNamesComment || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Reg. type note</label>
+                    <input class="form-input" id="reg-type-comment" value="${esc(dt.registrationTypeComment || '')}">
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // ── Parentage ────────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Parentage <span style="font-weight:400;font-size:11px;text-transform:none;letter-spacing:0;color:#80868b">— changes apply to all dogs in the same litter</span></div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Sire</label>
+                    <div class="ta-wrap" id="ta-sire"></div>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Dam</label>
+                    <div class="ta-wrap" id="ta-dam"></div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Date of Birth</label>
+                    <input class="form-input" type="date" id="dob" value="${esc(isoDate(d.dateOfWhelp) || '')}">
+                </div>
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Breeder</label>
+                    <div class="ta-wrap" id="ta-breeder"></div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Date of birth note</label>
+                    <input class="form-input" id="dob-comment" value="${esc(dt.dateOfWhelpComment || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Breeder note</label>
+                    <input class="form-input" id="breeder-comment" value="${esc(dt.breederComment || '')}">
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // ── Ownership ────────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Ownership</div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Owner</label>
+                    <div class="ta-wrap" id="ta-owner"></div>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Previous Owner</label>
+                    <div class="ta-wrap" id="ta-prev-owner"></div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Date Acquired by Owner</label>
+                    <input class="form-input" type="date" id="date-acquired" value="${esc(isoDate(dt.dateAcquired) || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Designated Beneficiary</label>
+                    <div class="ta-wrap" id="ta-beneficiary"></div>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Registered By</label>
+                    <div class="ta-wrap" id="ta-registered-by"></div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Owner note</label>
+                    <input class="form-input" id="owner-comment" value="${esc(dt.ownerComment || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Previous owner note</label>
+                    <input class="form-input" id="prev-owner-comment" value="${esc(dt.previousOwnerComment || '')}">
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // ── Other Registrations ──────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Other Registration Information</div>
+        <div class="card-body">
+            <table class="reg-table">
+                <thead><tr>
+                    <th>Registry</th>
+                    <th>Registration Number</th>
+                    <th>Registered Name</th>
+                    <th>Note</th>
+                </tr></thead>
+                <tbody>`;
+
+    for (const registry of ['UKC','IESR','ARF','NKC','Other']) {
+        const r = _extRegs[registry] || {};
+        html += `<tr>
+            <td>${registry}</td>
+            <td><input class="form-input" data-reg="${registry}" data-reg-field="num"  value="${esc(r.registrationNumber || '')}"></td>
+            <td><input class="form-input" data-reg="${registry}" data-reg-field="name" value="${esc(r.registeredName || '')}"></td>
+            <td><input class="form-input" data-reg="${registry}" data-reg-field="comment" value="${esc(r.comment || '')}"></td>
+        </tr>`;
+    }
+    html += `</tbody></table>`;
+
+    const ukcRibbon = dt.ukcPurpleRibbon;
+    html += `<div style="margin-top:10px">
+        <label class="check-label">
+            <input type="checkbox" id="ukc-purple"${ukcRibbon ? ' checked' : ''}>
+            UKC Purple Ribbon
+        </label>
+    </div>`;
+    html += `</div></div>`;
+
+    // ── ID Numbers ───────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Identification Numbers</div>
+        <div class="card-body">
+            <div class="section-rule">Microchip</div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Number</label>
+                    <input class="form-input" id="chip-num" value="${esc(dt.microchipNumber || '')}">
+                </div>
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Registry</label>
+                    <select class="form-select" id="chip-reg">${opts(_lookups.microchipRegistries, dt.microchipRegistryId)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" id="chip-type">${opts(_lookups.microchipTypes, dt.microchipTypeId)}</select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Microchip note</label>
+                    <input class="form-input" id="chip-comment" value="${esc(dt.microchipNumberComment || '')}">
+                </div>
+            </div>
+            <div class="section-rule">Tattoo</div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Number</label>
+                    <input class="form-input" id="tattoo-num" value="${esc(dt.tattooNumber || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Registry</label>
+                    <input class="form-input" id="tattoo-reg" value="${esc(dt.tattooRegistry || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Tattoo note</label>
+                    <input class="form-input" id="tattoo-comment" value="${esc(dt.tattooNumberComment || '')}">
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // ── Physical ─────────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Physical Information</div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Coat Color</label>
+                    <select class="form-select" id="coat-color">${opts(_lookups.coatColors, dt.coatColorCode)}</select>
+                </div>
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Predominant White Markings</label>
+                    <select class="form-select" id="white-markings">${opts(_lookups.whiteMarkings, dt.whiteMarkingsText)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Tail</label>
+                    <select class="form-select" id="tail">${opts(_lookups.tails, dt.tailText)}</select>
+                </div>
+            </div>
+            <div class="section-rule">Other Markings &amp; Colors <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">— check all that apply</span></div>
+            <div class="check-grid" style="margin-bottom:10px">
+                ${(_lookups.otherMarkings || []).map(m =>
+                    `<label class="check-label">
+                        <input type="checkbox" data-marking="${m.code}"${markSet.has(m.text) ? ' checked' : ''}>
+                        ${esc(m.text)}
+                    </label>`
+                ).join('')}
+            </div>
+            <div class="section-rule">Size</div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Adult Height (inches)</label>
+                    <input class="form-input" type="number" min="0" max="40" id="height" value="${dt.adultHeight || ''}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age Height Measured (months)</label>
+                    <input class="form-input" type="number" min="0" id="height-age" value="${dt.adultHeightAgeInMonths || ''}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Adult Weight (pounds)</label>
+                    <input class="form-input" type="number" min="0" max="200" id="weight" value="${dt.adultWeight || ''}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age Weight Measured (months)</label>
+                    <input class="form-input" type="number" min="0" id="weight-age" value="${dt.adultWeightAgeInMonths || ''}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Height / weight note</label>
+                    <input class="form-input" id="height-weight-comment" value="${esc(dt.adultWeightHeightComment || '')}">
+                </div>
+            </div>
+            <div class="section-rule">Reproductive Status</div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Spay / Neuter / Intact</label>
+                    <select class="form-select" id="spay-status">${opts(_lookups.spayStatus, dt.spayNeuterIntactText)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age at Spay/Neuter (months)</label>
+                    <input class="form-input" type="number" min="0" id="spay-age" value="${dt.spayNeuterAgeInMonths || ''}">
+                </div>
+                <div class="form-group" style="flex:2"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Rear Dew Claws</label>
+                    <select class="form-select" id="rear-dew-claws">${boolOpts(dt.rearDewClaws)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Blue Eyes</label>
+                    <select class="form-select" id="blue-eyes">${boolOpts(dt.blueEyes)}</select>
+                </div>
+                <div class="form-group" style="flex:2"></div>
+            </div>
+        </div>
+    </div>`;
+
+    // ── Health ───────────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Health</div>
+        <div class="card-body">
+            <div class="section-rule">Health Problems <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">— check all that apply</span></div>
+            <div class="check-grid" style="margin-bottom:10px">
+                ${(_lookups.healthProblems || []).map(hp =>
+                    `<label class="check-label">
+                        <input type="checkbox" data-hp="${hp.code}"${hpSet.has(hp.text) ? ' checked' : ''}>
+                        ${esc(hp.text)}
+                    </label>`
+                ).join('')}
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Other health information</label>
+                    <textarea class="form-textarea" id="other-health" rows="3">${esc(dt.otherHealthInformation || '')}</textarea>
+                </div>
+            </div>
+            <div class="section-rule">Death</div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age at Death</label>
+                    <div class="age-row">
+                        <input class="form-input" type="number" min="0" id="death-years" value="${ageYears || ''}">
+                        <span>yr</span>
+                        <input class="form-input" type="number" min="0" max="11" id="death-months" value="${ageMo || ''}">
+                        <span>mo</span>
+                    </div>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age at death note</label>
+                    <input class="form-input" id="death-comment" value="${esc(dt.ageAtDeathComment || '')}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Cause of Death</label>
+                    <select class="form-select" id="cause-of-death">${opts(_lookups.causesOfDeath, dt.causeOfDeathId)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Other Cause of Death</label>
+                    <input class="form-input" id="other-cause" value="${esc(dt.otherCauseOfDeath || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Cause of death note</label>
+                    <input class="form-input" id="cause-comment" value="${esc(dt.causeOfDeathComment || '')}">
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // ── Health Tests ─────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Health Tests</div>
+        <div class="card-body">
+            <div class="section-rule">PennHIP <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">— copy of report is required</span></div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">DI — Left / Right</label>
+                    <div style="display:flex;gap:8px">
+                        <input class="form-input" id="ph-di-l" placeholder="Left" value="${esc(dt.pennHIPDILeft || '')}">
+                        <input class="form-input" id="ph-di-r" placeholder="Right" value="${esc(dt.pennHIPDIRight || '')}">
+                    </div>
+                </div>
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">DJD — Left / Right</label>
+                    <div style="display:flex;gap:8px">
+                        ${boolSelect('ph-djd-l', dt.pennHIPDJDLeft)}
+                        ${boolSelect('ph-djd-r', dt.pennHIPDJDRight)}
+                    </div>
+                </div>
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Cavitation — Left / Right</label>
+                    <div style="display:flex;gap:8px">
+                        ${boolSelect('ph-cav-l', dt.pennHIPCavitationLeft)}
+                        ${boolSelect('ph-cav-r', dt.pennHIPCavitationRight)}
+                    </div>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age (months)</label>
+                    <input class="form-input" type="number" min="0" id="ph-age" value="${dt.pennHIPAgeInMonths || ''}">
+                </div>
+            </div>
+
+            <div class="section-rule">OFA Hips <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">— copy required if not on OFA website</span></div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Result</label>
+                    <select class="form-select" id="ofa-hips">${opts(_lookups.ofaHipsResults, dt.ofaHipsResultText)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age (months)</label>
+                    <input class="form-input" type="number" min="0" id="ofa-hips-age" value="${dt.ofaHipsAgeInMonths || ''}">
+                </div>
+                <div class="form-group" style="flex:3"></div>
+            </div>
+
+            <div class="section-rule">GDC Hips <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">— copy required if not on OFA website</span></div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Result</label>
+                    <input class="form-input" id="gdc-hips" value="${esc(dt.gdcHipsResult || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age (months)</label>
+                    <input class="form-input" type="number" min="0" id="gdc-hips-age" value="${dt.gdcHipsAgeInMonths || ''}">
+                </div>
+                <div class="form-group" style="flex:3"></div>
+            </div>
+
+            <div class="section-rule">Other Radiographic Hips <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">— copy from vet or radiologist required</span></div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Result</label>
+                    <input class="form-input" id="other-hips" value="${esc(dt.otherRadiographicHipsResult || '')}">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age (months)</label>
+                    <input class="form-input" type="number" min="0" id="other-hips-age" value="${dt.otherRadiographicHipsAgeInMonths || ''}">
+                </div>
+                <div class="form-group" style="flex:3">
+                    <label class="form-label">Note</label>
+                    <input class="form-input" id="other-hips-comment" value="${esc(dt.otherRadiographicHipsResultComment || '')}">
+                </div>
+            </div>
+
+            <div class="section-rule">OFA Elbows <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">— copy required if not on OFA website</span></div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Result</label>
+                    <select class="form-select" id="ofa-elbows">${opts(_lookups.ofaElbowsResults, dt.ofaElbowsResultText)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age (months)</label>
+                    <input class="form-input" type="number" min="0" id="ofa-elbows-age" value="${dt.ofaElbowsAgeInMonths || ''}">
+                </div>
+                <div class="form-group" style="flex:3"></div>
+            </div>
+
+            <div class="section-rule">CERF <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">— copy required if not on CERF website; expires 1 year after test</span></div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Result</label>
+                    <select class="form-select" id="cerf">${opts(_lookups.cerfResults, dt.cerfResultText)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age (months)</label>
+                    <input class="form-input" type="number" min="0" id="cerf-age" value="${dt.cerfAgeInMonths || ''}">
+                </div>
+                <div class="form-group" style="flex:3"></div>
+            </div>
+
+            <div class="section-rule">MDR1 Mutation Test <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">— copy required</span></div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Result</label>
+                    <select class="form-select" id="mdr1">${opts(_lookups.mdr1Results, dt.mdr1ResultText)}</select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Age (months)</label>
+                    <input class="form-input" type="number" min="0" id="mdr1-age" value="${dt.mdr1GeneticMutationAgeInMonths || ''}">
+                </div>
+                <div class="form-group" style="flex:3"></div>
+            </div>
+        </div>
+    </div>`;
+
+    // ── Owner's Description ──────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Owner's Description</div>
+        <div class="card-body">
+            <textarea class="form-textarea" id="owners-description" rows="8">${esc(dt.ownersDescription || '')}</textarea>
+        </div>
+    </div>`;
+
+    // ── Occupations ──────────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Occupations</div>
+        <div class="card-body">
+            <div class="form-row" style="margin-bottom:10px">
+                <div class="form-group" style="flex:1">
+                    <label class="check-label">
+                        <input type="checkbox" id="farm-ranch"${dt.farmOrRanchDog ? ' checked' : ''}>
+                        Farm dog / Ranch dog work
+                    </label>
+                </div>
+            </div>
+            <div class="section-rule">Other Occupations <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">— check all that apply</span></div>
+            <div class="check-grid" style="margin-bottom:10px">
+                ${(_lookups.occupations || []).map(occ =>
+                    `<label class="check-label">
+                        <input type="checkbox" data-occ="${occ.code}"${occSet.has(occ.text) ? ' checked' : ''}>
+                        ${esc(occ.text)}
+                    </label>`
+                ).join('')}
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Occupations note</label>
+                    <input class="form-input" id="occ-comment" value="${esc(dt.occupationsComment || '')}">
+                </div>
+            </div>
+            <div class="section-rule">Type of Livestock Regularly Worked</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px 16px;margin-bottom:10px">
+                ${[['dairy_cattle','Dairy Cattle'],['beef_cattle','Beef Cattle'],
+                   ['sheep','Sheep'],['goats','Goats'],
+                   ['hogs','Hogs'],['horses','Horses'],['poultry','Poultry']].map(([field, label]) =>
+                    `<div class="form-group">
+                        <label class="form-label">${label}</label>
+                        <input class="form-input" type="number" min="0" id="livestock-${field}" value="${dt[field] || dt[snakeToCamel(field)] || ''}">
+                    </div>`
+                ).join('')}
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Livestock note</label>
+                    <input class="form-input" id="livestock-comment" value="${esc(dt.livestockNumbersComment || '')}">
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // ── Activities / Titles ──────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Activities / Titles</div>
+        <div class="card-body">
+            ${DISCIPLINES.map(disc =>
+                `<div class="form-row" style="margin-bottom:8px">
+                    <div class="form-group" style="flex:0 0 200px">
+                        <label class="form-label">${esc(disc.label)}</label>
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <input class="form-input" data-discipline="${esc(disc.val)}"
+                               value="${esc(_titles[disc.val] || '')}">
+                    </div>
+                </div>`
+            ).join('')}
+        </div>
+    </div>`;
+
+    // ── Photo Captions ───────────────────────────────────────────────────
+    html += `<div class="card">
+        <div class="card-head">Photo Captions</div>
+        <div class="card-body">
+            ${Array.from({length: 10}, (_, i) =>
+                `<div class="form-row" style="margin-bottom:8px">
+                    <div class="form-group" style="flex:0 0 70px">
+                        <label class="form-label">Photo ${i}</label>
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <input class="form-input" data-photo="${i}" value="${esc(photoMap[i] || '')}">
+                    </div>
+                </div>`
+            ).join('')}
+        </div>
+    </div>`;
+
+    // ── Registrar Notes ──────────────────────────────────────────────────
+    html += `<div class="card registrar-banner">
+        <div class="card-head">Registrar Private Comments <span style="font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">(internal)</span></div>
+        <div class="card-body">
+            <textarea class="form-textarea" id="registrars-comment" rows="6">${esc(dt.registrarsComment || '')}</textarea>
+        </div>
+    </div>`;
+
+    // ── Action bar ────────────────────────────────────────────────────────
+    html += `<div class="action-bar">
+        <a class="btn-ghost" id="cancel-btn" href="${dogId ? 'dog.html?id=' + dogId : 'index.html'}">Cancel</a>
+        <div style="display:flex;gap:12px;align-items:center">
+            <span class="save-status" id="save-status"></span>
+            <button class="btn-primary" type="button" id="save-btn">${dogId ? 'Save changes' : 'Create dog'}</button>
+        </div>
+    </div>`;
+
+    document.getElementById('main').innerHTML = html;
+
+    // Init typeaheads
+    initTA('sire',         dogSearch,    d.sireId,        dogLabel(d.sireName, d.sireReg));
+    initTA('dam',          dogSearch,    d.damId,         dogLabel(d.damName,  d.damReg));
+    initTA('breeder',      personSearch, d.breederId,     d.breederName);
+    initTA('owner',        personSearch, d.ownerId,       d.ownerName);
+    initTA('prev-owner',   personSearch, d.previousOwnerId, d.previousOwnerName);
+    initTA('beneficiary',  personSearch, d.beneficiaryId, d.beneficiaryName);
+    initTA('registered-by',personSearch, d.registeredById,d.registeredByName);
+
+    document.getElementById('save-btn').addEventListener('click', save);
+}
+
+/* ── Collect & Save ──────────────────────────────────────────────────── */
+async function save() {
+    const btn    = document.getElementById('save-btn');
+    const status = document.getElementById('save-status');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    status.textContent = ''; status.style.color = '';
+
+    // For new dogs: create the record first, then save details
+    if (!dogId) {
+        const name = document.getElementById('dog-name')?.value?.trim();
+        if (!name) {
+            status.textContent = 'ESC Name is required.';
+            status.style.color = '#d93025';
+            btn.disabled = false; btn.textContent = 'Create dog';
+            return;
+        }
+        try {
+            const cr = await fetch('api.php?type=dog-create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({dogName: name}),
+            }).then(r => r.json());
+            if (!cr.ok) {
+                status.textContent = 'Error: ' + (cr.error || 'could not create dog');
+                status.style.color = '#d93025';
+                btn.disabled = false; btn.textContent = 'Create dog';
+                return;
+            }
+            dogId = cr.id;
+            history.replaceState(null, '', 'dog-edit.html?id=' + dogId);
+            document.getElementById('page-title').textContent = 'Edit ' + name;
+            document.getElementById('cancel-btn').href = 'dog.html?id=' + dogId;
+            btn.textContent = 'Save changes';
+        } catch {
+            status.textContent = 'Network error — not created';
+            status.style.color = '#d93025';
+            btn.disabled = false; btn.textContent = 'Create dog';
+            return;
+        }
+    }
+
+    // External registrations
+    const externalRegistrations = ['UKC','IESR','ARF','NKC','Other'].map(registry => ({
+        registry,
+        registrationNumber: document.querySelector(`[data-reg="${registry}"][data-reg-field="num"]`)?.value  || '',
+        registeredName:     document.querySelector(`[data-reg="${registry}"][data-reg-field="name"]`)?.value || '',
+        comment:            document.querySelector(`[data-reg="${registry}"][data-reg-field="comment"]`)?.value || '',
+    }));
+
+    // Occupation IDs
+    const occupationIds = Array.from(document.querySelectorAll('[data-occ]:checked'))
+        .map(el => parseInt(el.dataset.occ, 10)).filter(Boolean);
+
+    // Health problem IDs
+    const healthProblemIds = Array.from(document.querySelectorAll('[data-hp]:checked'))
+        .map(el => parseInt(el.dataset.hp, 10)).filter(Boolean);
+
+    // Marking IDs
+    const markingIds = Array.from(document.querySelectorAll('[data-marking]:checked'))
+        .map(el => parseInt(el.dataset.marking, 10)).filter(Boolean);
+
+    // Titles
+    const titles = DISCIPLINES
+        .map(disc => ({
+            discipline: disc.val,
+            titles: document.querySelector(`[data-discipline="${disc.val}"]`)?.value || '',
+        }))
+        .filter(t => t.titles.trim() !== '');
+
+    // Photo captions
+    const photoCaptions = Array.from({length: 10}, (_, i) => ({
+        idx:     i,
+        caption: document.querySelector(`[data-photo="${i}"]`)?.value || '',
+    }));
+
+    const payload = {
+        id:                    dogId,  // always set by this point
+        name:                  v('dog-name'),
+        sex:                   v('sex')     || 'Unknown',
+        descriptor:            v('descriptor'),
+        registrationType:      v('reg-type')   || 'Unknown',
+        registrationTypeComment: v('reg-type-comment'),
+        callNames:             v('call-names'),
+        callNamesComment:      v('call-names-comment'),
+        nameComment:           v('name-comment'),
+        // Parentage
+        sireId:                _ta['sire']?.id         || null,
+        damId:                 _ta['dam']?.id          || null,
+        dateOfWhelp:           v('dob'),
+        breederId:             _ta['breeder']?.id      || null,
+        dateOfWhelpComment:    v('dob-comment'),
+        breederComment:        v('breeder-comment'),
+        // Ownership
+        ownerId:               _ta['owner']?.id         || null,
+        previousOwnerId:       _ta['prev-owner']?.id    || null,
+        dateAcquired:          v('date-acquired'),
+        beneficiaryId:         _ta['beneficiary']?.id   || null,
+        registeredById:        _ta['registered-by']?.id || null,
+        ownerComment:          v('owner-comment'),
+        previousOwnerComment:  v('prev-owner-comment'),
+        // Physical
+        coatColorCode:         v('coat-color'),
+        whiteMarkings:         v('white-markings')   || 'Unknown',
+        tail:                  v('tail')             || 'Unknown',
+        adultHeight:           nv('height'),
+        adultHeightAgeMonths:  nv('height-age'),
+        adultWeight:           nv('weight'),
+        adultWeightAgeMonths:  nv('weight-age'),
+        heightWeightComment:   v('height-weight-comment'),
+        spayStatus:            v('spay-status')      || 'Unknown',
+        spayAgeMonths:         nv('spay-age'),
+        rearDewClaws:          v('rear-dew-claws'),
+        blueEyes:              v('blue-eyes'),
+        farmOrRanchDog:        document.getElementById('farm-ranch')?.checked ? 1 : 0,
+        // Health
+        otherHealthInfo:       v('other-health'),
+        ageAtDeathYears:       nv('death-years'),
+        ageAtDeathMonths:      nv('death-months'),
+        ageAtDeathComment:     v('death-comment'),
+        causeOfDeathId:        v('cause-of-death'),
+        otherCauseOfDeath:     v('other-cause'),
+        causeOfDeathComment:   v('cause-comment'),
+        // PennHIP
+        pennhipDiLeft:         v('ph-di-l'),
+        pennhipDiRight:        v('ph-di-r'),
+        pennhipDjdLeft:        v('ph-djd-l'),
+        pennhipDjdRight:       v('ph-djd-r'),
+        pennhipCavLeft:        v('ph-cav-l'),
+        pennhipCavRight:       v('ph-cav-r'),
+        pennhipAge:            nv('ph-age'),
+        // OFA / GDC / etc.
+        ofaHipsResult:         v('ofa-hips')         || 'Unknown',
+        ofaHipsAge:            nv('ofa-hips-age'),
+        gdcHipsResult:         v('gdc-hips'),
+        gdcHipsAge:            nv('gdc-hips-age'),
+        otherHipsResult:       v('other-hips'),
+        otherHipsAge:          nv('other-hips-age'),
+        otherHipsComment:      v('other-hips-comment'),
+        ofaElbowsResult:       v('ofa-elbows')       || 'Unknown',
+        ofaElbowsAge:          nv('ofa-elbows-age'),
+        cerfResult:            v('cerf')             || 'Unknown',
+        cerfAge:               nv('cerf-age'),
+        mdr1Result:            v('mdr1')             || 'Unknown',
+        mdr1Age:               nv('mdr1-age'),
+        // Ownership II
+        ownersDescription:     v('owners-description'),
+        // Occupations
+        occupationsComment:    v('occ-comment'),
+        beefCattle:            nv('livestock-beef_cattle'),
+        dairyCattle:           nv('livestock-dairy_cattle'),
+        sheep:                 nv('livestock-sheep'),
+        goats:                 nv('livestock-goats'),
+        hogs:                  nv('livestock-hogs'),
+        horses:                nv('livestock-horses'),
+        poultry:               nv('livestock-poultry'),
+        livestockComment:      v('livestock-comment'),
+        // ID numbers
+        microchipNumber:       v('chip-num'),
+        microchipRegistryId:   v('chip-reg'),
+        microchipTypeId:       v('chip-type'),
+        microchipComment:      v('chip-comment'),
+        tattooNumber:          v('tattoo-num'),
+        tattooRegistry:        v('tattoo-reg'),
+        tattooComment:         v('tattoo-comment'),
+        // Misc
+        ukcPurpleRibbon:       document.getElementById('ukc-purple')?.checked ? 1 : 0,
+        registrarsComment:     v('registrars-comment'),
+        // Collections
+        occupationIds,
+        healthProblemIds,
+        markingIds,
+        externalRegistrations,
+        titles,
+        photoCaptions,
+    };
+
+    try {
+        const r = await fetch('api.php?type=dog-save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        }).then(r => r.json());
+
+        if (r.ok) {
+            status.textContent = '✓ Saved';
+            status.style.color = '#137333';
+            setTimeout(() => { status.textContent = ''; }, 4000);
+        } else {
+            status.textContent = 'Error: ' + (r.error || 'save failed');
+            status.style.color = '#d93025';
+        }
+    } catch {
+        status.textContent = 'Network error — not saved';
+        status.style.color = '#d93025';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Save changes';
+}
+
+/* ── Helpers ─────────────────────────────────────────────────────────── */
+function v(id)  { const el = document.getElementById(id); return el ? (el.value || null) : null; }
+function nv(id) { const el = document.getElementById(id); if (!el || el.value === '') return null; const n = parseInt(el.value, 10); return isNaN(n) ? null : n; }
+
+function opts(items, current) {
+    if (!items) return '';
+    let html = '<option value="">—</option>';
+    for (const it of items) {
+        const sel = String(it.code) === String(current) ? ' selected' : '';
+        html += `<option value="${esc(String(it.code))}"${sel}>${esc(it.text)}</option>`;
+    }
+    return html;
+}
+
+function boolOpts(current) {
+    return [['', '—'], ['0', 'No'], ['1', 'Yes']]
+        .map(([val, text]) => `<option value="${val}"${String(current) === val ? ' selected' : ''}>${text}</option>`)
+        .join('');
+}
+
+function boolSelect(id, current) {
+    return `<select class="form-select" id="${id}">${boolOpts(current)}</select>`;
+}
+
+function isoDate(s) {
+    if (!s) return null;
+    const d = s.split('T')[0].split(' ')[0];
+    return (d && d !== '0000-00-00') ? d : null;
+}
+
+function snakeToCamel(s) {
+    return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+function esc(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
