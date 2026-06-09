@@ -91,3 +91,6 @@ docker-compose.override.yml
 tmp/
 temp/
 artifacts/
+
+# Generated build outputs
+DECISIONS.html
