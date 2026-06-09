@@ -134,6 +134,7 @@ main { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
 <header>
   <a href="index.html">← Search</a>
   <h1 id="page-title">Edit Litter</h1>
+  <a href="#" onclick="signOut();return false;" style="margin-left:auto">Sign out</a>
 </header>
 
 <main id="main">
@@ -142,6 +143,16 @@ main { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
 
 <script>
 "use strict";
+
+async function signOut() {
+    await fetch('api.php?type=logout', {method: 'POST'});
+    location.href = 'login.html';
+}
+
+fetch('api.php?type=session').then(r=>r.json()).then(s=>{
+    if(!s.loggedIn) location.href='login.html?next='+encodeURIComponent(location.pathname+location.search);
+    else if ((s.roleId || 0) < 3) location.href = 'index.html';
+});
 
 /* ── Globals ─────────────────────────────────────────────────────────── */
 const params    = new URLSearchParams(location.search);

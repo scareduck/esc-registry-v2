@@ -76,6 +76,7 @@ main { max-width: 900px; margin: 0 auto; padding: 32px 20px 60px; }
 <header>
   <a href="index.html">← Search</a>
   <h1 id="page-title">Kennel</h1>
+  <a href="#" onclick="signOut();return false;" style="margin-left:auto">Sign out</a>
 </header>
 
 <main id="main">
@@ -84,6 +85,15 @@ main { max-width: 900px; margin: 0 auto; padding: 32px 20px 60px; }
 
 <script>
 "use strict";
+
+async function signOut() {
+    await fetch('api.php?type=logout', {method: 'POST'});
+    location.href = 'login.html';
+}
+
+fetch('api.php?type=session').then(r=>r.json()).then(s=>{
+    if(!s.loggedIn) location.href='login.html?next='+encodeURIComponent(location.pathname+location.search);
+});
 
 const params   = new URLSearchParams(location.search);
 const kennelId = parseInt(params.get('id') || '0', 10);

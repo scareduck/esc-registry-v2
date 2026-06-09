@@ -115,6 +115,7 @@ main { padding: 24px 16px 60px; }
   <a id="dog-link" href="#">Dog Detail</a>
   <span class="sep">|</span>
   <h1 id="page-title">5-Generation Pedigree</h1>
+  <a href="#" onclick="signOut();return false;" style="margin-left:auto">Sign out</a>
 </header>
 
 <main id="main">
@@ -123,6 +124,15 @@ main { padding: 24px 16px 60px; }
 
 <script>
 "use strict";
+
+async function signOut() {
+    await fetch('api.php?type=logout', {method: 'POST'});
+    location.href = 'login.html';
+}
+
+fetch('api.php?type=session').then(r=>r.json()).then(s=>{
+    if(!s.loggedIn) location.href='login.html?next='+encodeURIComponent(location.pathname+location.search);
+});
 
 const params = new URLSearchParams(location.search);
 const dogId  = parseInt(params.get('id') || '0', 10);

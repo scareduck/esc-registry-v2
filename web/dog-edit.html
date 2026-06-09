@@ -143,6 +143,7 @@ main { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
 <header>
   <a href="index.html">← Search</a>
   <h1 id="page-title">Edit Dog</h1>
+  <a href="#" onclick="signOut();return false;" style="margin-left:auto">Sign out</a>
 </header>
 
 <main id="main">
@@ -151,6 +152,11 @@ main { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
 
 <script>
 "use strict";
+
+async function signOut() {
+    await fetch('api.php?type=logout', {method: 'POST'});
+    location.href = 'login.html';
+}
 
 const params = new URLSearchParams(location.search);
 let dogId    = parseInt(params.get('id') || '0', 10);
@@ -287,6 +293,19 @@ function initTA(key, searchFn, id, name) {
 }
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
+function redirectToLogin() {
+    location.href = 'login.html?next=' + encodeURIComponent(location.pathname + location.search);
+}
+
+fetch('api.php?type=session').then(r => r.json()).then(session => {
+    if (!session.loggedIn) { redirectToLogin(); return; }
+    if ((session.roleId || 0) < 3) { location.href = 'index.html'; return; }
+    bootLoad();
+}).catch(() => {
+    document.getElementById('main').innerHTML = '<div class="error-box">Failed to load — check server connection.</div>';
+});
+
+function bootLoad() {
 if (!dogId) {
     fetch('api.php?type=lookups').then(r => r.json()).then(lookups => {
         _lookups = lookups;
@@ -319,6 +338,7 @@ if (!dogId) {
         document.getElementById('main').innerHTML = '<div class="error-box">Failed to load — check server connection.</div>';
     });
 }
+} // end bootLoad
 
 /* ── Main render ───────────────────────────────────────────────────────── */
 function render() {

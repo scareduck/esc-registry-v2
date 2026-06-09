@@ -1,4 +1,9 @@
 <?php
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_samesite', 'Lax');
+ini_set('session.use_strict_mode', '1');
+session_start();
+
 header('Content-Type: application/json');
 header('Cache-Control: no-cache');
 
@@ -41,6 +46,85 @@ try {
 }
 
 $type = $_GET['type'] ?? '';
+
+// ── Auth helpers ──────────────────────────────────────────────────────
+function requireAuth(int $minRoleId = 1): void {
+    if (empty($_SESSION['person_id'])) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Not authenticated']);
+        exit;
+    }
+    if (($minRoleId > 1) && (($_SESSION['user_role_id'] ?? 0) < $minRoleId)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Not authorized']);
+        exit;
+    }
+}
+
+// ── Session ───────────────────────────────────────────────────────────
+if ($type === 'session') {
+    echo json_encode([
+        'loggedIn'  => !empty($_SESSION['person_id']),
+        'personId'  => $_SESSION['person_id']  ?? null,
+        'roleId'    => $_SESSION['user_role_id'] ?? null,
+        'username'  => $_SESSION['username']   ?? null,
+    ]);
+    exit;
+}
+
+// ── Login ─────────────────────────────────────────────────────────────
+if ($type === 'login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body     = json_decode(file_get_contents('php://input'), true);
+    $username = trim($body['username'] ?? '');
+    $password = $body['password'] ?? '';
+
+    if ($username === '' || $password === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Username and password required']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT p.person_id, p.password_hash, p.user_role_id, r.role_name
+         FROM people p
+         LEFT JOIN user_roles r ON r.user_role_id = p.user_role_id
+         WHERE p.username = :u");
+    $stmt->execute([':u' => $username]);
+    $person = $stmt->fetch();
+
+    $authenticated = false;
+
+    if ($person && !empty($person['password_hash'])) {
+        $authenticated = password_verify($password, $person['password_hash']);
+    }
+
+    if (!$authenticated) {
+        http_response_code(401);
+        echo json_encode(['ok' => false, 'error' => 'Invalid username or password']);
+        exit;
+    }
+
+    session_regenerate_id(true);
+    $_SESSION['person_id']    = $person['person_id'];
+    $_SESSION['user_role_id'] = $person['user_role_id'];
+    $_SESSION['username']     = $username;
+
+    echo json_encode([
+        'ok'       => true,
+        'personId' => $person['person_id'],
+        'roleId'   => $person['user_role_id'],
+        'roleName' => $person['role_name'],
+    ]);
+    exit;
+}
+
+// ── Logout ────────────────────────────────────────────────────────────
+if ($type === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION = [];
+    session_destroy();
+    echo json_encode(['ok' => true]);
+    exit;
+}
 
 // ── Search ────────────────────────────────────────────────────────────
 if ($type === 'search') {
@@ -106,7 +190,7 @@ if ($type === 'search') {
         $ppl_params[":pfn{$i}"] = '%' . $tok . '%';
         $ppl_conds[] = "(p.given_name LIKE :pgn{$i} OR p.family_name LIKE :pfn{$i})";
     }
-    $ppl_where = implode(' AND ', $ppl_conds);
+    $ppl_where = '(' . implode(' AND ', $ppl_conds) . ') AND p.deleted_at IS NULL';
 
     $stmt = $pdo->prepare("
         SELECT p.person_id AS id, p.given_name AS givenName, p.family_name AS familyName,
@@ -533,6 +617,8 @@ if ($type === 'dog') {
         $titles[$r['discipline']] = $r['titles'];
     }
 
+    if (($_SESSION['user_role_id'] ?? 0) < 3) unset($detail['registrarsComment']);
+
     echo json_encode([
         'dog'                   => $dog,
         'detail'                => $detail,
@@ -559,12 +645,13 @@ if ($type === 'person') {
 
     $stmt = $pdo->prepare("
         SELECT p.person_id AS id, p.given_name AS givenName, p.family_name AS familyName,
-               p.username, p.comments, p.registrars_comments AS registrarsComments,
+               p.username, p.password_hash, p.deleted_at AS deletedAt,
+               p.comments, p.registrars_comments AS registrarsComments,
                p.publish_contact_info AS publishContactInfo,
                k.kennel_id AS kennelId, k.kennel_name AS kennelName,
                p.is_breeder AS isBreeder,
                p.alive,
-               ur.role_name AS roleText
+               ur.user_role_id AS roleId, ur.role_name AS roleText
         FROM   people p
         LEFT JOIN kennels    k  ON k.kennel_id  = p.kennel_id
         LEFT JOIN user_roles ur ON ur.user_role_id = p.user_role_id
@@ -573,6 +660,19 @@ if ($type === 'person') {
     $stmt->execute([':id' => $id]);
     $person = $stmt->fetch();
     if (!$person) { http_response_code(404); echo json_encode(['error' => 'person not found']); exit; }
+
+    $ph = $person['password_hash'];
+    $un = $person['username'];
+    if ($un === '') {
+        $person['accountStatus'] = 'none';
+    } elseif ($ph === 'disabled') {
+        $person['accountStatus'] = 'disabled';
+    } elseif ($ph !== null && $ph !== '') {
+        $person['accountStatus'] = 'active';
+    } else {
+        $person['accountStatus'] = 'unmigrated';
+    }
+    unset($person['password_hash']);
 
     $stmt = $pdo->prepare("
         SELECT tnr.role_name AS role, tn.number
@@ -675,6 +775,8 @@ if ($type === 'person') {
     ");
     $stmt->execute([':id' => $id]);
     $litterPups = $stmt->fetchAll();
+
+    if (($_SESSION['user_role_id'] ?? 0) < 3) unset($person['registrarsComments']);
 
     echo json_encode([
         'person'           => $person,
@@ -900,6 +1002,7 @@ if ($type === 'litter') {
 
 // ── Litter create ────────────────────────────────────────────────────
 if ($type === 'litter-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth(3);
     $body = json_decode(file_get_contents('php://input'), true);
     $raw = $body['litterNumber'] ?? null;
     $litterNumber = ($raw !== null && $raw !== '') ? (int)$raw : null;
@@ -949,7 +1052,9 @@ if ($type === 'lookups') {
         'microchipTypes'     => fetchLookup($pdo, 'microchip_types', 'microchip_type_id', 'microchip_type_name'),
         'microchipRegistries'=> fetchLookup($pdo, 'microchip_registries', 'microchip_registry_id', 'registry_name'),
         'breedingMethods'    => enumLookup($pdo, 'breedings', 'breeding_method'),
-        'states'             => $pdo->query("SELECT state_code AS code, state_name AS text
+        'countries'          => $pdo->query("SELECT country_code AS code, country_name AS text
+                                             FROM countries ORDER BY country_name")->fetchAll(),
+        'states'             => $pdo->query("SELECT state_code AS code, state_name AS text, country_code AS countryCode
                                              FROM states ORDER BY state_name")->fetchAll(),
         'registrationTypes'  => enumLookup($pdo, 'dogs', 'registration_type'),
         'whiteMarkings'      => enumLookup($pdo, 'dogs', 'predominant_white_markings'),
@@ -962,6 +1067,7 @@ if ($type === 'lookups') {
         'healthProblems'     => fetchLookup($pdo, 'health_problems', 'health_problem_id', 'health_problem_name'),
         'otherMarkings'      => fetchLookup($pdo, 'other_markings', 'marking_id', 'marking_name'),
         'causesOfDeath'      => fetchLookup($pdo, 'causes_of_death', 'cause_of_death_id', 'cause_name'),
+        'userRoles'          => fetchLookup($pdo, 'user_roles', 'user_role_id', 'role_name'),
         'telephoneRoles'     => fetchLookup($pdo, 'telephone_number_roles', 'telephone_number_role_id', 'role_name'),
         'emailRoles'         => fetchLookup($pdo, 'email_address_roles', 'email_address_role_id', 'role_name'),
         'addressRoles'       => fetchLookup($pdo, 'postal_address_roles', 'postal_address_role_id', 'role_name'),
@@ -971,6 +1077,7 @@ if ($type === 'lookups') {
 
 // ── Litter save ──────────────────────────────────────────────────────
 if ($type === 'litter-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth(3);
     $body = json_decode(file_get_contents('php://input'), true);
     if (!$body) { http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit; }
 
@@ -1160,6 +1267,7 @@ if ($type === 'litter-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ── Person create ────────────────────────────────────────────────────
 if ($type === 'person-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth(3);
     $body = json_decode(file_get_contents('php://input'), true);
     $givenName  = trim($body['givenName']  ?? '');
     $familyName = trim($body['familyName'] ?? '');
@@ -1181,6 +1289,7 @@ if ($type === 'person-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ── Person save ──────────────────────────────────────────────────────
 if ($type === 'person-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth(3);
     $body = json_decode(file_get_contents('php://input'), true);
     if (!$body) { http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit; }
     $id = (int)($body['id'] ?? 0);
@@ -1200,6 +1309,8 @@ if ($type === 'person-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("UPDATE people SET
             given_name           = :g,
             family_name          = :f,
+            username             = :username,
+            user_role_id         = :roleId,
             is_breeder           = :breeder,
             kennel_id            = :kennel,
             alive                = :alive,
@@ -1209,6 +1320,8 @@ if ($type === 'person-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             WHERE person_id = :id")->execute([
             ':g'          => $nv($body['givenName']),
             ':f'          => $nv($body['familyName']),
+            ':username'   => $nv($body['username']),
+            ':roleId'     => $nvi($body['roleId']),
             ':breeder'    => $nvi($body['isBreeder']) ?? 0,
             ':kennel'     => $nvi($body['kennelId']),
             ':alive'      => $body['alive'] ?? 'Unknown',
@@ -1279,6 +1392,7 @@ if ($type === 'person-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ── Dog create ───────────────────────────────────────────────────────
 if ($type === 'dog-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth(3);
     $body = json_decode(file_get_contents('php://input'), true);
     $name = trim($body['dogName'] ?? '');
     if ($name === '') {
@@ -1298,6 +1412,7 @@ if ($type === 'dog-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ── Dog save ─────────────────────────────────────────────────────────
 if ($type === 'dog-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth(3);
     $body = json_decode(file_get_contents('php://input'), true);
     if (!$body) { http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit; }
     $id = (int)($body['id'] ?? 0);
@@ -1593,6 +1708,215 @@ if ($type === 'dog-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         http_response_code(500);
         echo json_encode(['error' => $e->getMessage()]);
     }
+    exit;
+}
+
+// ── Person admin helpers ──────────────────────────────────────────────
+
+function personAdminCheck(PDO $pdo, int $id): array {
+    $stmt = $pdo->prepare("SELECT person_id, username FROM people WHERE person_id = :id");
+    $stmt->execute([':id' => $id]);
+    $row = $stmt->fetch();
+    if (!$row) { http_response_code(404); echo json_encode(['error' => 'person not found']); exit; }
+    return $row;
+}
+
+function generatePassword(int $length = 12): string {
+    $chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $out = '';
+    $max = strlen($chars) - 1;
+    for ($i = 0; $i < $length; $i++) $out .= $chars[random_int(0, $max)];
+    return $out;
+}
+
+// ── Reset password ────────────────────────────────────────────────────
+if ($type === 'person-reset-password' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth(3);
+    $body = json_decode(file_get_contents('php://input'), true);
+    $id   = (int)($body['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'missing id']); exit; }
+    $row  = personAdminCheck($pdo, $id);
+    if (empty($row['username'])) {
+        http_response_code(400); echo json_encode(['error' => 'person has no username']); exit;
+    }
+    $clear = generatePassword(12);
+    $pdo->prepare("UPDATE people SET password_hash = :h WHERE person_id = :id")
+        ->execute([':h' => password_hash($clear, PASSWORD_DEFAULT), ':id' => $id]);
+    echo json_encode(['ok' => true, 'password' => $clear]);
+    exit;
+}
+
+// ── Disable account ───────────────────────────────────────────────────
+if ($type === 'person-disable-account' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth(3);
+    $body = json_decode(file_get_contents('php://input'), true);
+    $id   = (int)($body['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'missing id']); exit; }
+    $row  = personAdminCheck($pdo, $id);
+    $pdo->prepare("UPDATE people SET password_hash = 'disabled' WHERE person_id = :id")
+        ->execute([':id' => $id]);
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
+// ── Delete user account (keep person record) ──────────────────────────
+if ($type === 'person-delete-account' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth(3);
+    $body = json_decode(file_get_contents('php://input'), true);
+    $id   = (int)($body['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'missing id']); exit; }
+    personAdminCheck($pdo, $id);
+    $pdo->prepare("UPDATE people SET username = '', password_hash = NULL, user_role_id = NULL WHERE person_id = :id")
+        ->execute([':id' => $id]);
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
+// ── Soft-delete person ────────────────────────────────────────────────
+if ($type === 'person-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth(3);
+    $body = json_decode(file_get_contents('php://input'), true);
+    $id   = (int)($body['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'missing id']); exit; }
+    personAdminCheck($pdo, $id);
+    $pdo->prepare("UPDATE people SET deleted_at = NOW(), password_hash = 'disabled' WHERE person_id = :id")
+        ->execute([':id' => $id]);
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
+// ── Forgot password ───────────────────────────────────────────────────
+if ($type === 'forgot-password' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body  = json_decode(file_get_contents('php://input'), true);
+    $input = trim($body['usernameOrEmail'] ?? '');
+
+    // Always return ok=true — never reveal whether account/email exists
+    if ($input === '') {
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
+    // Try username first, then email address
+    $stmt = $pdo->prepare(
+        "SELECT p.person_id, p.username
+         FROM people p
+         WHERE p.username = :u AND p.username != ''
+           AND p.deleted_at IS NULL AND p.password_hash != 'disabled'
+         LIMIT 1");
+    $stmt->execute([':u' => $input]);
+    $person = $stmt->fetch();
+
+    if (!$person) {
+        $stmt = $pdo->prepare(
+            "SELECT p.person_id, p.username
+             FROM people p
+             JOIN email_addresses ea ON ea.person_id = p.person_id
+             WHERE ea.email_address = :e AND p.username != ''
+               AND p.deleted_at IS NULL AND p.password_hash != 'disabled'
+             LIMIT 1");
+        $stmt->execute([':e' => $input]);
+        $person = $stmt->fetch();
+    }
+
+    if ($person) {
+        // Find primary email address to send to
+        $emailStmt = $pdo->prepare(
+            "SELECT ea.email_address
+             FROM email_addresses ea
+             JOIN email_address_roles ear ON ear.email_address_role_id = ea.email_address_role_id
+             WHERE ea.person_id = :id
+             ORDER BY ea.email_address_role_id
+             LIMIT 1");
+        $emailStmt->execute([':id' => $person['person_id']]);
+        $emailRow = $emailStmt->fetch();
+
+        if ($emailRow) {
+            // Delete existing unused tokens for this person
+            $pdo->prepare("DELETE FROM password_resets WHERE person_id = :id AND used_at IS NULL")
+                ->execute([':id' => $person['person_id']]);
+
+            $token     = bin2hex(random_bytes(32));
+            $expiresAt = date('Y-m-d H:i:s', time() + 3600);
+
+            $pdo->prepare(
+                "INSERT INTO password_resets (token, person_id, expires_at) VALUES (:t, :p, :e)")
+                ->execute([':t' => $token, ':p' => $person['person_id'], ':e' => $expiresAt]);
+
+            // Build reset URL
+            $appUrl = rtrim($env['APP_URL'] ?? '', '/');
+            if (!$appUrl) {
+                $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $dir    = dirname($_SERVER['SCRIPT_NAME'] ?? '/api.php');
+                $appUrl = $scheme . '://' . $host . rtrim($dir, '/');
+            }
+
+            $resetUrl = $appUrl . '/reset-password.html?token=' . $token;
+            $to       = $emailRow['email_address'];
+            $subject  = 'ESCR Registry — Password Reset';
+            $message  = "Hello {$person['username']},\r\n\r\n"
+                      . "A password reset was requested for your ESCR Registry account.\r\n\r\n"
+                      . "Click the link below to set a new password. This link expires in 1 hour.\r\n\r\n"
+                      . $resetUrl . "\r\n\r\n"
+                      . "If you did not request this, you can ignore this email.\r\n";
+            $mailFrom = $env['MAIL_FROM'] ?? 'noreply@esc-registry.org';
+            $headers  = "From: {$mailFrom}\r\nReply-To: {$mailFrom}\r\nX-Mailer: PHP";
+            @mail($to, $subject, $message, $headers);
+        }
+    }
+
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
+// ── Check reset token ─────────────────────────────────────────────────
+if ($type === 'check-reset-token') {
+    $token = trim($_GET['token'] ?? '');
+    if (strlen($token) !== 64) {
+        echo json_encode(['valid' => false, 'reason' => 'invalid']);
+        exit;
+    }
+    $stmt = $pdo->prepare(
+        "SELECT token FROM password_resets
+         WHERE token = :t AND used_at IS NULL AND expires_at > NOW()");
+    $stmt->execute([':t' => $token]);
+    $row = $stmt->fetch();
+    echo json_encode(['valid' => (bool)$row]);
+    exit;
+}
+
+// ── Reset password ────────────────────────────────────────────────────
+if ($type === 'reset-password' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body     = json_decode(file_get_contents('php://input'), true);
+    $token    = trim($body['token'] ?? '');
+    $password = $body['password'] ?? '';
+
+    if (strlen($token) !== 64 || strlen($password) < 8) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid request']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT pr.person_id
+         FROM password_resets pr
+         WHERE pr.token = :t AND pr.used_at IS NULL AND pr.expires_at > NOW()");
+    $stmt->execute([':t' => $token]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Reset link is invalid or has expired']);
+        exit;
+    }
+
+    $hash = password_hash($password, PASSWORD_DEFAULT);
+    $pdo->prepare("UPDATE people SET password_hash = :h WHERE person_id = :id")
+        ->execute([':h' => $hash, ':id' => $row['person_id']]);
+    $pdo->prepare("UPDATE password_resets SET used_at = NOW() WHERE token = :t")
+        ->execute([':t' => $token]);
+
+    echo json_encode(['ok' => true]);
     exit;
 }
 

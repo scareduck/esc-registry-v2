@@ -1,6 +1,6 @@
--- Migration: RegistryDB → escr2
+-- Migration: RegistryDB + AuthorizationDB → escr2
 -- Run after escr2_schema.sql has been applied.
--- Requires both databases to be accessible on the same server.
+-- Requires RegistryDB, AuthorizationDB, and escr2 to be accessible on the same server.
 --
 -- Usage:  mariadb -u root < migrate_registry.sql
 --
@@ -650,6 +650,36 @@ INSERT INTO user_requests (
   LEFT JOIN RegistryDB.Country c ON c.code = s.countrycode;
 
 -- ---------------------------------------------------------------------------
+-- Auth migration: AuthorizationDB → escr2.people
+--
+-- Roles: AuthorizationDB.user_roles is authoritative; override the role
+--        copied from RegistryDB.Person.role with the highest role held in
+--        AuthorizationDB (User < Helper < Registrar < Admin by user_role_id).
+--
+-- Passwords: MD5 hashes are not migrated — they are insecure and cannot be
+--        verified by password_verify().  Instead:
+--          disabled → password_hash = 'disabled'  (account locked)
+--          active   → password_hash = NULL         (shown as "unmigrated" in
+--                      the admin UI; use Reset Password to grant access)
+-- ---------------------------------------------------------------------------
+
+UPDATE people p
+JOIN (
+    SELECT aur.user_name, MAX(ur.user_role_id) AS max_role_id
+    FROM AuthorizationDB.user_roles aur
+    JOIN escr2.user_roles ur ON ur.role_name = aur.role_name
+    GROUP BY aur.user_name
+) r ON r.user_name = p.username
+SET p.user_role_id = r.max_role_id
+WHERE p.username != '';
+
+UPDATE people p
+JOIN AuthorizationDB.users u ON u.user_name = p.username
+SET p.password_hash = 'disabled'
+WHERE u.user_pass = 'disabled'
+  AND p.username != '';
+
+-- ---------------------------------------------------------------------------
 -- Re-enable FK checks
 -- ---------------------------------------------------------------------------
 
@@ -658,7 +688,22 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- ---------------------------------------------------------------------------
 -- Verify row counts against expected RegistryDB values
 -- ---------------------------------------------------------------------------
--- SELECT 'dogs' t, COUNT(*) n FROM dogs             -- expect ~23145
+-- SELECT 'dogs'     t, COUNT(*) n FROM dogs             -- expect ~23145
 -- UNION ALL SELECT 'breedings', COUNT(*) FROM breedings  -- expect ~6037
 -- UNION ALL SELECT 'litters',   COUNT(*) FROM litters    -- expect ~6025
 -- UNION ALL SELECT 'people',    COUNT(*) FROM people;    -- expect ~13884
+
+-- Auth migration sanity check (run separately after migration):
+-- SELECT
+--     COUNT(*)                                        AS total_with_username,
+--     SUM(password_hash = 'disabled')                AS disabled,
+--     SUM(password_hash IS NULL)                     AS unmigrated_need_reset,
+--     SUM(password_hash IS NOT NULL
+--         AND password_hash != 'disabled')           AS active_bcrypt
+-- FROM people WHERE username != '';
+--
+-- Cross-check: users in AuthorizationDB with no matching escr2 person
+-- (these had accounts but were never linked to a Person record):
+-- SELECT u.user_name FROM AuthorizationDB.users u
+-- LEFT JOIN escr2.people p ON p.username = u.user_name
+-- WHERE p.person_id IS NULL;

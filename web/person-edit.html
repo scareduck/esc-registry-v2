@@ -43,6 +43,32 @@ main { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
 }
 .card-body { padding: 16px 20px; }
 .registrar-banner { background: #fff8e1; border-left: 4px solid #fbc02d; }
+.admin-banner     { background: #fce8e6; border-left: 4px solid #ea4335; }
+
+.btn-danger {
+  background: none; border: 1px solid #ea4335; border-radius: 6px; color: #c5221f;
+  padding: 7px 14px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
+}
+.btn-danger:hover:not(:disabled) { background: #fce8e6; }
+.btn-danger:disabled { opacity: .45; cursor: not-allowed; }
+
+.account-chip {
+  display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 600;
+}
+.chip-active   { background: #e6f4ea; color: #137333; }
+.chip-disabled { background: #fce8e6; color: #c5221f; }
+.chip-none     { background: #f1f3f4; color: #5f6368; }
+
+.temp-pass {
+  background: #e8f0fe; border: 1px solid #1a73e8; border-radius: 6px;
+  padding: 10px 14px; font-family: monospace; font-size: 15px; font-weight: 700;
+  color: #1967d2; letter-spacing: .08em; margin-top: 10px; display: flex;
+  align-items: center; gap: 10px;
+}
+.deleted-banner {
+  background: #fce8e6; border: 1px solid #f5c6c2; border-radius: 8px;
+  padding: 10px 16px; font-size: 13px; color: #c5221f; font-weight: 500; margin-bottom: 16px;
+}
 
 .form-label {
   display: block; font-size: 11px; font-weight: 600;
@@ -122,6 +148,7 @@ main { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
 <header>
   <a href="index.html">← Search</a>
   <h1 id="page-title">Edit Person</h1>
+  <a href="#" onclick="signOut();return false;" style="margin-left:auto">Sign out</a>
 </header>
 
 <main id="main">
@@ -130,6 +157,11 @@ main { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
 
 <script>
 "use strict";
+
+async function signOut() {
+    await fetch('api.php?type=logout', {method: 'POST'});
+    location.href = 'login.html';
+}
 
 const params   = new URLSearchParams(location.search);
 let personId   = parseInt(params.get('id') || '0', 10);
@@ -219,6 +251,19 @@ async function kennelSearch(q) {
 }
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
+function redirectToLogin() {
+    location.href = 'login.html?next=' + encodeURIComponent(location.pathname + location.search);
+}
+
+fetch('api.php?type=session').then(r => r.json()).then(session => {
+    if (!session.loggedIn) { redirectToLogin(); return; }
+    if ((session.roleId || 0) < 3) { location.href = 'index.html'; return; }
+    bootLoad();
+}).catch(() => {
+    document.getElementById('main').innerHTML = '<div class="error-box">Failed to load — check server connection.</div>';
+});
+
+function bootLoad() {
 if (!personId) {
     fetch('api.php?type=lookups').then(r => r.json()).then(lookups => {
         _lookups = lookups;
@@ -246,6 +291,7 @@ if (!personId) {
         document.getElementById('main').innerHTML = '<div class="error-box">Failed to load — check server connection.</div>';
     });
 }
+} // end bootLoad
 
 /* ── Render ────────────────────────────────────────────────────────────── */
 function render() {
@@ -295,14 +341,19 @@ function render() {
                     <div class="ta-wrap" id="ta-kennel"></div>
                 </div>
                 <div class="form-group" style="flex:1">
-                    <label class="form-label">Username <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">(system)</span></label>
-                    <input class="form-input" value="${esc(p.username || '')}" readonly>
+                    <label class="form-label">Username <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">(login)</span></label>
+                    <input class="form-input" id="username" value="${esc(p.username || '')}" placeholder="Leave blank if no account">
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group" style="flex:1">
-                    <label class="form-label">Membership / Role <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#80868b">(system)</span></label>
-                    <input class="form-input" value="${esc(p.roleText || 'not registered')}" readonly>
+                    <label class="form-label">Membership / Role</label>
+                    <select class="form-select" id="user-role">
+                        <option value="">— no account —</option>
+                        ${(_lookups.userRoles || []).map(r =>
+                            `<option value="${esc(String(r.code))}"${String(p.roleId) === String(r.code) ? ' selected' : ''}>${esc(r.text)}</option>`
+                        ).join('')}
+                    </select>
                 </div>
                 <div class="form-group" style="flex:1"></div>
             </div>
@@ -313,13 +364,9 @@ function render() {
     html += `<div class="card">
         <div class="card-head">Comments</div>
         <div class="card-body">
-            <div class="form-group" style="margin-bottom:10px">
+            <div class="form-group">
                 <label class="form-label">Public Comments</label>
                 <textarea class="form-textarea" id="comments" rows="4">${esc(p.comments || '')}</textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Comments limited to Registrars only</label>
-                <textarea class="form-textarea" id="registrars-comments" rows="4">${esc(p.registrarsComments || '')}</textarea>
             </div>
         </div>
     </div>`;
@@ -409,9 +456,18 @@ function render() {
                         <input class="form-input" data-addr-role="${rid}" data-addr-field="city" value="${esc(a.city || '')}">
                     </div>
                     <div class="form-group" style="flex:2">
+                        <label class="form-label">Country</label>
+                        <select class="form-select" data-addr-role="${rid}" data-addr-field="country"
+                                onchange="filterAddrStates('${rid}', this.value)">
+                            ${opts(_lookups.countries, a.country || 'US')}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:2">
                         <label class="form-label">State / Province</label>
                         <select class="form-select" data-addr-role="${rid}" data-addr-field="state">
-                            ${opts(_lookups.states, a.state)}
+                            ${stateOpts(_lookups.states, a.country || 'US', a.state)}
                         </select>
                     </div>
                     <div class="form-group" style="flex:1">
@@ -437,6 +493,53 @@ function render() {
         </div>
     </div>`;
 
+    // ── Administration ────────────────────────────────────────────────────
+    if (personId) {
+        const status     = p.accountStatus || 'none';
+        const hasAccount = status !== 'none';
+        const canDisable = status === 'active' || status === 'unmigrated';
+        const chipClass  = (status === 'active' || status === 'unmigrated') ? 'chip-active'
+                         : status === 'disabled' ? 'chip-disabled' : 'chip-none';
+        const chipLabel  = status === 'active'     ? 'Active'
+                         : status === 'unmigrated' ? 'Active (legacy)'
+                         : status === 'disabled'   ? 'Disabled' : 'No account';
+        const deletedAt  = p.deletedAt
+            ? new Date(p.deletedAt).toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'})
+            : null;
+
+        const deletedBanner = deletedAt
+            ? `<div class="deleted-banner">This person was deleted on ${deletedAt}. Hidden from search and public views.</div>`
+            : '';
+        const accountBtns = hasAccount
+            ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+                <button class="btn-ghost" type="button" id="btn-reset-pw">Reset Password</button>
+                ${canDisable ? '<button class="btn-ghost" type="button" id="btn-disable">Disable Account</button>' : ''}
+                <button class="btn-ghost" type="button" id="btn-del-account">Delete User Account</button>
+               </div>
+               <div id="temp-pass-wrap" style="display:none"></div>
+               <div style="border-top:1px solid #fadad8;margin-bottom:14px"></div>`
+            : '';
+        const deleteBtnNote = deletedAt
+            ? ''
+            : '<span style="font-size:12px;color:#80868b;margin-left:10px">Hides from search; keeps all dog records intact.</span>';
+
+        html += `<div class="card admin-banner">
+            <div class="card-head">Administration</div>
+            <div class="card-body">
+                ${deletedBanner}
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                    <span style="font-size:12px;color:#5f6368;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Account</span>
+                    <span class="account-chip ${chipClass}">${chipLabel}</span>
+                </div>
+                ${accountBtns}
+                <div>
+                    <button class="btn-danger" type="button" id="btn-del-person"${deletedAt ? ' disabled' : ''}>Delete Person</button>
+                    ${deleteBtnNote}
+                </div>
+            </div>
+        </div>`;
+    }
+
     // ── Action bar ────────────────────────────────────────────────────────
     html += `<div class="action-bar">
         <a class="btn-ghost" id="cancel-btn" href="${personId ? 'person.html?id=' + personId : 'index.html'}">Cancel</a>
@@ -455,12 +558,11 @@ function render() {
 
     document.getElementById('save-btn').addEventListener('click', save);
 
-    // Sync registrar-comments field → reg-notes card (both map to same field)
-    const regNotesEl = document.getElementById('reg-notes');
-    const regCommentsEl = document.getElementById('registrars-comments');
-    if (regNotesEl && regCommentsEl) {
-        regCommentsEl.addEventListener('input', () => regNotesEl.value = regCommentsEl.value);
-        regNotesEl.addEventListener('input', () => regCommentsEl.value = regNotesEl.value);
+    if (personId) {
+        document.getElementById('btn-reset-pw')    ?.addEventListener('click', adminResetPassword);
+        document.getElementById('btn-disable')     ?.addEventListener('click', adminDisableAccount);
+        document.getElementById('btn-del-account') ?.addEventListener('click', adminDeleteAccount);
+        document.getElementById('btn-del-person')  ?.addEventListener('click', adminDeletePerson);
     }
 }
 
@@ -524,23 +626,26 @@ async function save() {
     // Addresses
     const addresses = (_lookups.addressRoles || []).map(role => ({
         roleId:         role.code,
-        streetAddress1: document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="s1"]`)?.value    || '',
-        streetAddress2: document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="s2"]`)?.value    || '',
-        city:           document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="city"]`)?.value  || '',
-        stateCode:      document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="state"]`)?.value || '',
-        postalCode:     document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="zip"]`)?.value   || '',
-        note:           document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="note"]`)?.value  || '',
+        streetAddress1: document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="s1"]`)?.value       || '',
+        streetAddress2: document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="s2"]`)?.value       || '',
+        city:           document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="city"]`)?.value     || '',
+        countryCode:    document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="country"]`)?.value  || '',
+        stateCode:      document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="state"]`)?.value    || '',
+        postalCode:     document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="zip"]`)?.value      || '',
+        note:           document.querySelector(`[data-addr-role="${role.code}"][data-addr-field="note"]`)?.value     || '',
     }));
 
     const payload = {
         id:                  personId,
         givenName:           document.getElementById('given-name')?.value        || '',
         familyName:          document.getElementById('family-name')?.value       || '',
+        username:            document.getElementById('username')?.value?.trim()  || '',
+        roleId:              document.getElementById('user-role')?.value         || null,
         isBreeder:           document.getElementById('is-breeder')?.value        || null,
         alive:               document.getElementById('alive')?.value             || 'Unknown',
         kennelId:            _ta['kennel']?.id || null,
         comments:            document.getElementById('comments')?.value          || '',
-        registrarsComments:  document.getElementById('registrars-comments')?.value || '',
+        registrarsComments:  document.getElementById('reg-notes')?.value || '',
         publishContactInfo:  document.getElementById('pub-contact')?.checked ? 1 : 0,
         phones,
         emails,
@@ -548,11 +653,13 @@ async function save() {
     };
 
     try {
-        const r = await fetch('api.php?type=person-save', {
+        const resp = await fetch('api.php?type=person-save', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload),
-        }).then(r => r.json());
+        });
+        if (resp.status === 401) { redirectToLogin(); return; }
+        const r = await resp.json();
 
         if (r.ok) {
             status.textContent = '✓ Saved';
@@ -571,7 +678,77 @@ async function save() {
     btn.textContent = 'Save changes';
 }
 
+/* ── Admin actions ───────────────────────────────────────────────────── */
+
+async function adminPost(type, extraMsg) {
+    const r = await fetch('api.php?type=' + type, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: personId}),
+    }).then(r => r.json());
+    if (!r.ok) { alert('Error: ' + (r.error || 'request failed')); return null; }
+    return r;
+}
+
+async function adminResetPassword() {
+    if (!confirm('Generate a new temporary password for this user?')) return;
+    const r = await adminPost('person-reset-password');
+    if (!r) return;
+    const wrap = document.getElementById('temp-pass-wrap');
+    wrap.style.display = 'block';
+    wrap.innerHTML = `<div class="temp-pass" id="temp-pass-display">
+        <span>Temp password:</span>
+        <span id="temp-pass-val">${esc(r.password)}</span>
+        <button class="btn-ghost" type="button" style="padding:4px 10px;font-size:12px"
+            onclick="navigator.clipboard.writeText(document.getElementById('temp-pass-val').textContent)">Copy</button>
+    </div>`;
+    // Reload to update account status chip
+    const freshData = await fetch('api.php?type=person&id=' + personId).then(r => r.json());
+    if (freshData.person) { _person = freshData.person; }
+}
+
+async function adminDisableAccount() {
+    if (!confirm('Disable this account? The user will not be able to log in.')) return;
+    const r = await adminPost('person-disable-account');
+    if (!r) return;
+    const freshData = await fetch('api.php?type=person&id=' + personId).then(r => r.json());
+    if (freshData.person) { _person = freshData.person; _phones = freshData.phones || []; _emails = freshData.emails || []; _addresses = freshData.addresses || []; render(); }
+}
+
+async function adminDeleteAccount() {
+    if (!confirm('Delete this user account? This removes login credentials but keeps the person record.')) return;
+    const r = await adminPost('person-delete-account');
+    if (!r) return;
+    const freshData = await fetch('api.php?type=person&id=' + personId).then(r => r.json());
+    if (freshData.person) { _person = freshData.person; _phones = freshData.phones || []; _emails = freshData.emails || []; _addresses = freshData.addresses || []; render(); }
+}
+
+async function adminDeletePerson() {
+    const name = [_person?.givenName, _person?.familyName].filter(Boolean).join(' ') || 'this person';
+    if (!confirm(`Delete ${name}? They will be hidden from search. This cannot be undone from the UI.`)) return;
+    const r = await adminPost('person-delete');
+    if (!r) return;
+    const freshData = await fetch('api.php?type=person&id=' + personId).then(r => r.json());
+    if (freshData.person) { _person = freshData.person; _phones = freshData.phones || []; _emails = freshData.emails || []; _addresses = freshData.addresses || []; render(); }
+}
+
 /* ── Helpers ─────────────────────────────────────────────────────────── */
+function stateOpts(states, countryCode, current) {
+    const filtered = (states || []).filter(s => s.countryCode === countryCode);
+    if (!filtered.length) return '<option value="">—</option>';
+    let html = '<option value="">—</option>';
+    for (const s of filtered) {
+        const sel = s.code === current ? ' selected' : '';
+        html += `<option value="${esc(s.code)}"${sel}>${esc(s.text)}</option>`;
+    }
+    return html;
+}
+
+function filterAddrStates(roleCode, countryCode) {
+    const sel = document.querySelector(`[data-addr-role="${roleCode}"][data-addr-field="state"]`);
+    if (sel) sel.innerHTML = stateOpts(_lookups.states, countryCode, '');
+}
+
 function opts(items, current) {
     if (!items) return '';
     let html = '<option value="">—</option>';
