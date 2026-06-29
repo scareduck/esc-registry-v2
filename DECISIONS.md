@@ -57,3 +57,15 @@ In practice both prevent login. The distinction is suspension vs. full disassoci
 **Note:** If A is implemented, it may make the approval queue in Decision 3 less necessary (override rather than pre-approve).
 
 ---
+
+## 5. Reporting features
+
+**Context:** The current registry has no reporting functionality. During an email
+exchange today (2026-06-10), Rebecca asked for a list of individuals with admin and
+registrar access. This should be part of a suite of reports available to people
+depending on access level. Others might include
+
+* Litters registered/entered over some period of time
+* Dogs registered/entered over some period of time
+
+--

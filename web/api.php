@@ -18,6 +18,49 @@ function loadEnv(string $path): array {
     return $out;
 }
 
+function smtpSend(array $env, string $to, string $subject, string $body): bool {
+    $host = $env['MAIL_SMTP_HOST'] ?? '';
+    $port = (int)($env['MAIL_SMTP_PORT'] ?? 465);
+    $user = $env['MAIL_SMTP_USER'] ?? '';
+    $pass = $env['MAIL_SMTP_PASS'] ?? '';
+    $from = $env['MAIL_FROM']      ?? $user;
+
+    if (!$host || !$user || !$pass) return false;
+
+    $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
+    $sock = @stream_socket_client("ssl://{$host}:{$port}", $errno, $errstr, 10, STREAM_CLIENT_CONNECT, $ctx);
+    if (!$sock) return false;
+
+    $read = fn() => fgets($sock, 512);
+    $send = fn(string $cmd) => fwrite($sock, $cmd . "\r\n");
+
+    $read(); // greeting
+    $send("EHLO localhost");
+    while (($line = $read()) !== false && strlen($line) >= 4 && $line[3] === '-');
+
+    $send("AUTH LOGIN");
+    $read();
+    $send(base64_encode($user));
+    $read();
+    $send(base64_encode($pass));
+    $authReply = $read();
+    if (!str_starts_with(trim($authReply), '235')) { fclose($sock); return false; }
+
+    $send("MAIL FROM:<{$from}>");
+    $read();
+    $send("RCPT TO:<{$to}>");
+    $read();
+    $send("DATA");
+    $read();
+
+    $headers = "From: {$from}\r\nTo: {$to}\r\nSubject: {$subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8";
+    $send($headers . "\r\n\r\n" . $body . "\r\n.");
+    $read();
+    $send("QUIT");
+    fclose($sock);
+    return true;
+}
+
 function readMyCnf(): array {
     $home = getenv('HOME') ?: '';
     $path = $home . '/.my.cnf';
@@ -1859,9 +1902,7 @@ if ($type === 'forgot-password' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                       . "Click the link below to set a new password. This link expires in 1 hour.\r\n\r\n"
                       . $resetUrl . "\r\n\r\n"
                       . "If you did not request this, you can ignore this email.\r\n";
-            $mailFrom = $env['MAIL_FROM'] ?? 'noreply@esc-registry.org';
-            $headers  = "From: {$mailFrom}\r\nReply-To: {$mailFrom}\r\nX-Mailer: PHP";
-            @mail($to, $subject, $message, $headers);
+            smtpSend($env, $to, $subject, $message);
         }
     }
 

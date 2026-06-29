@@ -17,7 +17,7 @@
 
 CREATE DATABASE IF NOT EXISTS `escr2`
   DEFAULT CHARACTER SET utf8mb4
-  COLLATE utf8mb4_general_ci;
+  COLLATE utf8mb4_unicode_ci;
 
 USE `escr2`;
 
@@ -30,7 +30,7 @@ CREATE TABLE countries (
   country_name VARCHAR(255) NOT NULL DEFAULT '',
   menu_order   INT          NOT NULL DEFAULT 0,
   PRIMARY KEY (country_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE states (
   country_code VARCHAR(2)   NOT NULL,
@@ -39,7 +39,7 @@ CREATE TABLE states (
   menu_order   INT          NOT NULL DEFAULT 0,
   PRIMARY KEY (country_code, state_code),
   CONSTRAINT fk_states_country FOREIGN KEY (country_code) REFERENCES countries (country_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- Other lookup tables
@@ -50,84 +50,84 @@ CREATE TABLE coat_colors (
   coat_color_name VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order      INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (coat_color_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE breeds (
   breed_id   BIGINT       NOT NULL,
   breed_name VARCHAR(255) NOT NULL DEFAULT '',
   menu_order INT          NOT NULL DEFAULT 0,
   PRIMARY KEY (breed_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE occupations (
   occupation_id   BIGINT UNSIGNED NOT NULL,
   occupation_name VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order      INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (occupation_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE health_problems (
   health_problem_id   BIGINT UNSIGNED NOT NULL,
   health_problem_name VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order          INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (health_problem_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE other_markings (
   marking_id   BIGINT UNSIGNED NOT NULL,
   marking_name VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order   INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (marking_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE microchip_registries (
   microchip_registry_id BIGINT UNSIGNED NOT NULL,
   registry_name         VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order            INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (microchip_registry_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE microchip_types (
   microchip_type_id   BIGINT UNSIGNED NOT NULL,
   microchip_type_name VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order          INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (microchip_type_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE causes_of_death (
   cause_of_death_id BIGINT UNSIGNED NOT NULL,
   cause_name        VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order        INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (cause_of_death_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE user_roles (
   user_role_id BIGINT UNSIGNED NOT NULL,
   role_name    VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order   INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (user_role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE email_address_roles (
   email_address_role_id BIGINT UNSIGNED NOT NULL,
   role_name             VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order            INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (email_address_role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE postal_address_roles (
   postal_address_role_id BIGINT UNSIGNED NOT NULL,
   role_name              VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order             INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (postal_address_role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE telephone_number_roles (
   telephone_number_role_id BIGINT UNSIGNED NOT NULL,
   role_name                VARCHAR(255)    NOT NULL DEFAULT '',
   menu_order               INT             NOT NULL DEFAULT 0,
   PRIMARY KEY (telephone_number_role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- Core entity tables
@@ -137,7 +137,7 @@ CREATE TABLE kennels (
   kennel_id   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   kennel_name VARCHAR(255)    NOT NULL DEFAULT '',
   PRIMARY KEY (kennel_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE people (
   person_id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -157,7 +157,7 @@ CREATE TABLE people (
   KEY fk_people_kennel (kennel_id),
   CONSTRAINT fk_people_user_role FOREIGN KEY (user_role_id) REFERENCES user_roles (user_role_id),
   CONSTRAINT fk_people_kennel    FOREIGN KEY (kennel_id)    REFERENCES kennels (kennel_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- litters.dam_id → dogs and breedings.sire_id → dogs are added via ALTER TABLE
 -- after dogs is created (mutual reference).
@@ -205,7 +205,7 @@ CREATE TABLE litters (
   CONSTRAINT fk_litters_owner_of_dam  FOREIGN KEY (owner_of_dam_id)          REFERENCES people (person_id),
   CONSTRAINT fk_litters_owner_of_sire FOREIGN KEY (owner_of_sire_id)         REFERENCES people (person_id),
   CONSTRAINT fk_litters_state         FOREIGN KEY (country_code, state_code) REFERENCES states (country_code, state_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE breedings (
   breeding_id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -237,7 +237,7 @@ CREATE TABLE breedings (
     REFERENCES litters (litter_id),
   CONSTRAINT fk_breedings_state  FOREIGN KEY (country_code, state_code)
     REFERENCES states (country_code, state_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE dogs (
   -- identity / registration
@@ -394,7 +394,7 @@ CREATE TABLE dogs (
   CONSTRAINT fk_dogs_microchip_registry FOREIGN KEY (microchip_registry_id) REFERENCES microchip_registries (microchip_registry_id),
   CONSTRAINT fk_dogs_microchip_type     FOREIGN KEY (microchip_type_id)     REFERENCES microchip_types (microchip_type_id),
   CONSTRAINT fk_dogs_cause_of_death     FOREIGN KEY (cause_of_death_id)     REFERENCES causes_of_death (cause_of_death_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 ALTER TABLE litters
   ADD CONSTRAINT fk_litters_dam  FOREIGN KEY (dam_id)  REFERENCES dogs (dog_id);
@@ -412,7 +412,7 @@ CREATE TABLE dog_photos (
   caption     VARCHAR(255)     NOT NULL DEFAULT '',
   PRIMARY KEY (dog_id, photo_index),
   CONSTRAINT fk_dog_photos_dog FOREIGN KEY (dog_id) REFERENCES dogs (dog_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE external_registrations (
   dog_id              BIGINT UNSIGNED NOT NULL,
@@ -422,7 +422,7 @@ CREATE TABLE external_registrations (
   comment             TEXT         NOT NULL DEFAULT '',
   PRIMARY KEY (dog_id, registry),
   CONSTRAINT fk_ext_reg_dog FOREIGN KEY (dog_id) REFERENCES dogs (dog_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE dog_titles (
   dog_id     BIGINT UNSIGNED NOT NULL,
@@ -434,7 +434,7 @@ CREATE TABLE dog_titles (
   titles     TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (dog_id, discipline),
   CONSTRAINT fk_dog_titles_dog FOREIGN KEY (dog_id) REFERENCES dogs (dog_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- Junction tables
@@ -447,7 +447,7 @@ CREATE TABLE dog_breeds (
   PRIMARY KEY (dog_id, breed_id),
   CONSTRAINT fk_dog_breeds_dog   FOREIGN KEY (dog_id)   REFERENCES dogs (dog_id),
   CONSTRAINT fk_dog_breeds_breed FOREIGN KEY (breed_id) REFERENCES breeds (breed_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE dog_occupations (
   dog_id        BIGINT UNSIGNED NOT NULL,
@@ -455,7 +455,7 @@ CREATE TABLE dog_occupations (
   PRIMARY KEY (dog_id, occupation_id),
   CONSTRAINT fk_dog_occupations_dog        FOREIGN KEY (dog_id)        REFERENCES dogs (dog_id),
   CONSTRAINT fk_dog_occupations_occupation FOREIGN KEY (occupation_id) REFERENCES occupations (occupation_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE dog_health_problems (
   dog_id            BIGINT UNSIGNED NOT NULL,
@@ -463,7 +463,7 @@ CREATE TABLE dog_health_problems (
   PRIMARY KEY (dog_id, health_problem_id),
   CONSTRAINT fk_dog_hp_dog FOREIGN KEY (dog_id)            REFERENCES dogs (dog_id),
   CONSTRAINT fk_dog_hp_hp  FOREIGN KEY (health_problem_id) REFERENCES health_problems (health_problem_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE dog_markings (
   dog_id     BIGINT UNSIGNED NOT NULL,
@@ -471,7 +471,7 @@ CREATE TABLE dog_markings (
   PRIMARY KEY (dog_id, marking_id),
   CONSTRAINT fk_dog_markings_dog     FOREIGN KEY (dog_id)     REFERENCES dogs (dog_id),
   CONSTRAINT fk_dog_markings_marking FOREIGN KEY (marking_id) REFERENCES other_markings (marking_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- Contact tables
@@ -488,7 +488,7 @@ CREATE TABLE email_addresses (
   KEY fk_email_role (email_address_role_id),
   CONSTRAINT fk_email_person FOREIGN KEY (person_id)             REFERENCES people (person_id),
   CONSTRAINT fk_email_role   FOREIGN KEY (email_address_role_id) REFERENCES email_address_roles (email_address_role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE postal_addresses (
   postal_address_id      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -508,7 +508,7 @@ CREATE TABLE postal_addresses (
   CONSTRAINT fk_postal_person FOREIGN KEY (person_id)               REFERENCES people (person_id),
   CONSTRAINT fk_postal_state  FOREIGN KEY (country_code, state_code) REFERENCES states (country_code, state_code),
   CONSTRAINT fk_postal_role   FOREIGN KEY (postal_address_role_id)  REFERENCES postal_address_roles (postal_address_role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE telephone_numbers (
   telephone_number_id      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -521,7 +521,7 @@ CREATE TABLE telephone_numbers (
   KEY fk_phone_role (telephone_number_role_id),
   CONSTRAINT fk_phone_person FOREIGN KEY (person_id)                REFERENCES people (person_id),
   CONSTRAINT fk_phone_role   FOREIGN KEY (telephone_number_role_id) REFERENCES telephone_number_roles (telephone_number_role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- User requests
@@ -553,7 +553,7 @@ CREATE TABLE user_requests (
   KEY fk_user_requests_state (country_code, state_code),
   CONSTRAINT fk_user_requests_state FOREIGN KEY (country_code, state_code)
     REFERENCES states (country_code, state_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- COI table (local computed data, not migrated from RegistryDB)
@@ -564,4 +564,4 @@ CREATE TABLE coi (
   coi    FLOAT           NOT NULL DEFAULT 0,
   PRIMARY KEY (dog_id),
   CONSTRAINT fk_coi_dog FOREIGN KEY (dog_id) REFERENCES dogs (dog_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
