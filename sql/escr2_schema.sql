@@ -152,11 +152,23 @@ CREATE TABLE people (
   comments             TEXT            NOT NULL DEFAULT '',
   registrars_comments  TEXT            NOT NULL DEFAULT '',
   is_accepted          VARCHAR(5)      NOT NULL DEFAULT '',
+  password_hash        VARCHAR(255)    DEFAULT NULL,          -- bcrypt; NULL = unmigrated, 'disabled' = locked
+  deleted_at           DATETIME        DEFAULT NULL,          -- soft delete
   PRIMARY KEY (person_id),
   KEY fk_people_user_role (user_role_id),
   KEY fk_people_kennel (kennel_id),
   CONSTRAINT fk_people_user_role FOREIGN KEY (user_role_id) REFERENCES user_roles (user_role_id),
   CONSTRAINT fk_people_kennel    FOREIGN KEY (kennel_id)    REFERENCES kennels (kennel_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE password_resets (
+  token      CHAR(64)        NOT NULL,
+  person_id  BIGINT UNSIGNED NOT NULL,
+  expires_at DATETIME        NOT NULL,
+  used_at    DATETIME        DEFAULT NULL,
+  PRIMARY KEY (token),
+  KEY fk_password_resets_person (person_id),
+  CONSTRAINT fk_password_resets_person FOREIGN KEY (person_id) REFERENCES people (person_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- litters.dam_id → dogs and breedings.sire_id → dogs are added via ALTER TABLE
